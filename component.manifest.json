@@ -25,9 +25,28 @@
       "random": true
     }
   },
+  "config_schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "asset_base_path": {
+        "default": "assets",
+        "description": "Optional base path for resolving catalog or asset-backed cards.",
+        "type": "string",
+        "x-default-applied": true
+      },
+      "catalog_registry_file": {
+        "description": "Optional path to a JSON map of catalog names to asset paths (fallback for env-based resolution).",
+        "type": "string",
+        "x-optional": true
+      }
+    },
+    "title": "component-adaptive-card component configuration",
+    "type": "object"
+  },
   "describe_export": "get-manifest",
   "hashes": {
-    "component_wasm": "blake3:4d45bb8eff780744417d7c7b6022c20aaf796ed5a1f12c0a16fd6659db18d1b9"
+    "component_wasm": "blake3:031ee635bf88356bfd462510eaa796919d19089671b6257cfe09f9c677659ec9"
   },
   "id": "ai.greentic.component-adaptive-card",
   "limits": {

@@ -1,0 +1,31 @@
+id: ai.greentic.component-adaptive-card.custom
+kind: component-config
+description: Auto-generated custom config for ai.greentic.component-adaptive-card
+nodes:
+  ask_config:
+    questions:
+      fields:
+      - id: asset_base_path
+        prompt: Optional base path for resolving catalog or asset-backed cards.
+        type: string
+        default: assets
+      - id: catalog_registry_file
+        prompt: Optional path to a JSON map of catalog names to asset paths (fallback for env-based resolution).
+        type: string
+    routing:
+    - to: emit_config
+  emit_config:
+    template: |-
+      {
+        "node_id": "COMPONENT_STEP",
+        "node": {
+          "tool": {
+            "component": "ai.greentic.component-adaptive-card",
+            "asset_base_path": "{{state.asset_base_path}}",
+            "catalog_registry_file": "{{state.catalog_registry_file}}"
+          },
+          "routing": [
+            { "to": "NEXT_NODE_PLACEHOLDER" }
+          ]
+        }
+      }
