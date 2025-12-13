@@ -45,6 +45,56 @@
     "type": "object"
   },
   "describe_export": "get-manifest",
+  "dev_flows": {
+    "custom": {
+      "format": "flow-ir-json",
+      "graph": {
+        "description": "Auto-generated custom config for ai.greentic.component-adaptive-card",
+        "id": "ai.greentic.component-adaptive-card.custom",
+        "type": "component-config",
+        "nodes": {
+          "ask_config": {
+            "questions": {
+              "fields": [
+                {
+                  "default": "assets",
+                  "id": "asset_base_path",
+                  "prompt": "Optional base path for resolving catalog or asset-backed cards.",
+                  "type": "string"
+                },
+                {
+                  "id": "catalog_registry_file",
+                  "prompt": "Optional path to a JSON map of catalog names to asset paths (fallback for env-based resolution).",
+                  "type": "string"
+                }
+              ]
+            },
+            "routing": [
+              {
+                "to": "emit_config"
+              }
+            ]
+          },
+          "emit_config": {
+            "template": "{\n  \"node_id\": \"COMPONENT_STEP\",\n  \"node\": {\n    \"tool\": {\n      \"component\": \"ai.greentic.component-adaptive-card\",\n      \"asset_base_path\": \"{{state.asset_base_path}}\",\n      \"catalog_registry_file\": \"{{state.catalog_registry_file}}\"\n    },\n    \"routing\": [\n      { \"to\": \"NEXT_NODE_PLACEHOLDER\" }\n    ]\n  }\n}"
+          }
+        }
+      }
+    },
+    "default": {
+      "format": "flow-ir-json",
+      "graph": {
+        "description": "Auto-generated default config for ai.greentic.component-adaptive-card",
+        "id": "ai.greentic.component-adaptive-card.default",
+        "type": "component-config",
+        "nodes": {
+          "emit_config": {
+            "template": "{\n  \"node_id\": \"COMPONENT_STEP\",\n  \"node\": {\n    \"tool\": {\n      \"component\": \"ai.greentic.component-adaptive-card\"\n    },\n    \"routing\": [\n      { \"to\": \"NEXT_NODE_PLACEHOLDER\" }\n    ]\n  }\n}"
+          }
+        }
+      }
+    }
+  },
   "hashes": {
     "component_wasm": "blake3:78f21520c114744e38146ee15a4a6dbe42271efbd320f0fd103314bbdbf6160d"
   },
