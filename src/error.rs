@@ -6,7 +6,6 @@ pub enum ComponentError {
     InvalidInput(String),
     #[error("serialization error: {0}")]
     Serde(#[from] serde_json::Error),
-    #[cfg(not(target_arch = "wasm32"))]
     #[error("io error: {0}")]
     Io(#[from] std::io::Error),
     #[error("asset error: {0}")]

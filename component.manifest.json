@@ -24,8 +24,14 @@
     "wasi": {
       "clocks": true,
       "filesystem": {
-        "mode": "none",
-        "mounts": []
+        "mode": "read_only",
+        "mounts": [
+          {
+            "name": "workspace",
+            "host_class": "cwd",
+            "guest_path": "."
+          }
+        ]
       },
       "random": true
     }
@@ -151,7 +157,7 @@
     }
   },
   "hashes": {
-    "component_wasm": "blake3:8c16725ec52b3a1bbcf617545d54a207274fd5bf81cec8a0aa28a859472f0c14"
+    "component_wasm": "blake3:4c50c4fbaa43db1083d7863e57454cd7a8a935da416e368a226ebd10d864506e"
   },
   "id": "ai.greentic.component-adaptive-card",
   "limits": {

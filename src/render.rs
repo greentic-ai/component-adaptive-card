@@ -177,19 +177,10 @@ fn asset_base_path() -> String {
     std::env::var("ADAPTIVE_CARD_ASSET_BASE").unwrap_or_else(|_| "assets".to_string())
 }
 
-#[cfg(not(target_arch = "wasm32"))]
 fn load_card_from_path(path: &str) -> Result<Value, ComponentError> {
     let content = std::fs::read_to_string(path)?;
     let json: Value = serde_json::from_str(&content)?;
     Ok(json)
-}
-
-#[cfg(target_arch = "wasm32")]
-fn load_card_from_path(path: &str) -> Result<Value, ComponentError> {
-    let _ = path;
-    Err(ComponentError::InvalidInput(
-        "asset loading is not available in this profile".into(),
-    ))
 }
 
 fn load_with_candidates(

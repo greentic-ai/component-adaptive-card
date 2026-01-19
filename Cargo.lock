@@ -80,7 +80,7 @@ dependencies = [
 
 [[package]]
 name = "component-adaptive-card"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "greentic-interfaces-guest",
  "greentic-types",
@@ -267,9 +267,9 @@ dependencies = [
 
 [[package]]
 name = "greentic-interfaces-guest"
-version = "0.4.73"
+version = "0.4.75"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3250c68f0298e8e7460b3f188f6f1bcbd27e7ffc0f43815692aa318f05bac3cc"
+checksum = "b80346e01ff0c7b47751a554a49f2299c465c96d2074f464256a34f8b8cb572e"
 dependencies = [
  "greentic-types",
  "wit-bindgen",
@@ -279,9 +279,9 @@ dependencies = [
 
 [[package]]
 name = "greentic-types"
-version = "0.4.33"
+version = "0.4.37"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e2012e90e0ed198dc232ef354844dfb3c2276001fd3e87d48894a5b59c6b9c8f"
+checksum = "aa7a42265b70257abbed524d338a84e09c275687eb063e1adda9091f669f86a1"
 dependencies = [
  "anyhow",
  "chrono",
@@ -292,6 +292,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_with",
+ "sha2",
  "thiserror",
  "time",
 ]
@@ -627,18 +628,18 @@ dependencies = [
 
 [[package]]
 name = "thiserror"
-version = "2.0.17"
+version = "2.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f63587ca0f12b72a0600bcba1d40081f830876000bb46dd2337a3051618f4fc8"
+checksum = "4288b5bcbc7920c07a1149a35cf9590a2aa808e0bc1eafaade0b80947865fbc4"
 dependencies = [
  "thiserror-impl",
 ]
 
 [[package]]
 name = "thiserror-impl"
-version = "2.0.17"
+version = "2.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3ff15c8ecd7de3849db632e14d18d2571fa09dfc5ed93479bc4485c7a517c913"
+checksum = "ebc4ee7f67670e9b64d05fa4253e753e016c6c95ff35b89b7941d6b856dec1d5"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -850,6 +851,6 @@ dependencies = [
 
 [[package]]
 name = "zmij"
-version = "1.0.14"
+version = "1.0.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bd8f3f50b848df28f887acb68e41201b5aea6bc8a8dacc00fb40635ff9a72fea"
+checksum = "94f63c051f4fe3c1509da62131a678643c5b6fbdc9273b2b79d4378ebda003d2"

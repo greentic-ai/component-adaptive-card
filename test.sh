@@ -1,5 +1,5 @@
 #!/bin/bash
-../greentic-component/target/debug/greentic-component test \
+greentic-component test \
   --wasm target/wasm32-wasip2/release/component_adaptive_card.wasm \
   --manifest ./component.manifest.json \
   --op card --input-json '{

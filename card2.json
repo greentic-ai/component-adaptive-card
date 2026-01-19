@@ -1,0 +1,7 @@
+{
+    "type": "AdaptiveCard",
+    "version": "1.6",
+    "body": [
+        { "type": "TextBlock", "text": "Saved: @{state.form_data.comment||\"(none)\"}" }
+    ]
+}

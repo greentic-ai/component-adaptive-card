@@ -123,7 +123,7 @@ Registry and base path:
 - `ADAPTIVE_CARD_ASSET_REGISTRY` can point to a JSON map on disk.
 - `ADAPTIVE_CARD_CATALOG_FILE` can point to a JSON map for catalog names.
 - `ADAPTIVE_CARD_ASSET_BASE` controls the base folder (default `assets`).
-- In wasm32 builds, on-disk loading is disabled; use the host asset resolver or inline JSON.
+- In wasm32 builds, on-disk loading requires filesystem read access and an appropriate mount; otherwise use the host asset resolver or inline JSON.
 
 ## Bindings, expressions, and Handlebars
 
