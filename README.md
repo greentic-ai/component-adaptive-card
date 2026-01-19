@@ -1,195 +1,244 @@
-# Adaptive Card Component
+# component-adaptive-card
 
-The `component-adaptive-card` renders Adaptive Card v1.6 payloads and normalizes user interactions for Greentic flows. It supports inline cards, asset-backed cards, catalog lookup, binding/expression expansion, validation, and interaction-derived state/session updates.
+Render, validate, and (optionally) attach interaction placeholders to **Microsoft Adaptive Cards** — with a focus on **cross-channel compatibility** (Teams, Web Chat, Webex up to 1.3) and **graceful downsampling** when a channel can’t render a full card.
 
-## Quick start with greentic-dev
+This component is designed to be used inside Greentic flows (via `greentic-flow add-step`) and tested locally (via `greentic-component test`).
 
-Create a flow file and add a component step using `greentic-dev add-step` (note the component name is `adaptive-card`):
+---
+
+## What are Adaptive Cards?
+
+Adaptive Cards are a JSON-based UI description format (“cards”) that host apps (e.g. Microsoft Teams, Bot Framework Web Chat, Webex) can render. You author a single card payload, and host apps render it according to their capabilities.
+
+Key ideas:
+- A card has a top-level schema version (`"version": "1.3"` etc.)
+- Hosts support **different subsets** of elements/properties
+- The safest approach for broad compatibility is to target **1.3** and avoid features not supported by your host(s)
+
+Official references:
+- Adaptive Cards documentation and schema explorer: https://adaptivecards.io/explorer/
+- Adaptive Card Designer (interactive authoring): https://adaptivecards.io/designer/
+
+---
+
+## Host support overview
+
+### Microsoft Teams
+Teams supports Adaptive Cards across bots, message extensions, and task modules. Actual feature support depends on the client and surface.
+
+Recommendation: Target **Adaptive Cards 1.3** unless you control all clients.
+
+Docs:
+https://learn.microsoft.com/microsoftteams/platform/task-modules-and-cards/cards/cards-reference
+
+### Bot Framework Web Chat
+Web Chat renders Adaptive Cards using the bundled Adaptive Cards renderer. Supported schema depends on the version shipped with Web Chat.
+
+Recommendation: Treat **1.3** as the safe baseline unless you pin versions end-to-end.
+
+Docs:
+https://www.npmjs.com/package/botframework-webchat
+
+### Webex
+Webex bots explicitly support **Adaptive Cards 1.3** with a documented subset of elements and properties.
+
+Recommendation: Always target **1.3** for Webex bots.
+
+Docs:
+https://developer.webex.com/messaging/docs/buttons-and-cards
+https://developer.webex.com/blog/webex-bots-support-for-buttons-and-cards-v1-3
+
+---
+
+## Greentic downsampling behavior
+
+Greentic messaging providers handle cards according to channel capability:
+
+1. **Full Adaptive Card support**
+   - Card JSON is delivered as-is (or minimally transformed)
+
+2. **Partial / 1.3-only support**
+   - Unsupported elements or properties are stripped or rewritten
+   - Schema version may be clamped to `1.3`
+
+3. **No Adaptive Card support**
+   - Card is downsampled to readable text/markdown
+   - Actions are rendered as textual options or links
+   - Inputs are summarized as expected fields
+
+The goal is to preserve **intent**, even when rich UI is unavailable.
+
+---
+
+## Using the component in Greentic flows
+
+### Add step (default mode)
+
+Default mode assumes:
+- `card_source = asset`
+- You provide `card_spec.asset_path`
+- Optional interaction placeholders
 
 ```bash
-greentic-dev add-step \
-  --flow flows/adaptive-card.ygtc \
-  --id render_card \
-  --component adaptive-card \
-  --operation card \
-  --input examples/adaptive-card.inline.json
+greentic-flow add-step \
+  --component component-adaptive-card \
+  --mode default
 ```
 
-Example input (`examples/adaptive-card.inline.json`):
+You will be prompted for:
+- Card asset path
+- Whether interactions are needed
+- Optional interaction placeholders
+
+---
+
+### Add step (config mode)
+
+Config mode exposes the full configuration surface.
+
+```bash
+greentic-flow add-step \
+  --component component-adaptive-card \
+  --mode config
+```
+
+Or with a custom config flow file:
+
+```bash
+greentic-flow add-step \
+  --component component-adaptive-card \
+  --mode config \
+  --config-flow ./dev_flows.custom
+```
+
+Config mode allows:
+- Selecting card source (`asset`, `inline`, `catalog`)
+- Full card spec configuration
+- Template parameters and binding context
+- Render / validate behavior
+- Interaction placeholders
+- Output and debug options
+
+---
+
+## Conditional prompts with `show_if`
+
+The config flow supports conditional questions via `show_if`. A question is only asked (and required) when its `show_if` evaluates to true against the current answers, in order. If the controlling answer hasn't been asked yet, the dependent question is skipped.
+
+Boolean form (always show or always hide):
 
 ```json
-{
-  "card_source": "inline",
-        "card_spec": {
-          "inline_json": {
-            "type": "AdaptiveCard",
-            "version": "1.6",
-            "body": [
-              { "type": "TextBlock", "text": "Hello {{payload.user.name}}" }
-            ]
-          }
-        }
-}
+{ "id": "debug", "type": "bool", "show_if": true }
+{ "id": "internal_only", "type": "string", "show_if": false }
 ```
 
-Validate the flow:
-
-```bash
-greentic-dev flow validate -f flows/adaptive-card.ygtc --json
-```
-
-## Advanced example (assets, bindings, interactions)
-
-Render a catalog card, inject parameters, and validate output:
-
-```bash
-greentic-dev add-step \
-  --flow flows/adaptive-card-advanced.ygtc \
-  --id render_card \
-  --component adaptive-card \
-  --operation card \
-  --input examples/adaptive-card.catalog.json
-```
-
-Example input (`examples/adaptive-card.catalog.json`):
+Conditional on another answer (string/bool/number/choice):
 
 ```json
-{
-  "card_source": "catalog",
-  "card_spec": {
-    "catalog_name": "onboarding",
-    "template_params": {
-      "title": "Welcome",
-      "show_help": true
+{ "id": "mode", "type": "choice", "options": ["asset", "inline"] }
+{ "id": "asset_path", "type": "string", "required": true,
+  "show_if": { "id": "mode", "equals": "asset" } }
+```
+
+Notes:
+- `show_if` is evaluated against answers collected so far; missing answers mean "hide".
+- Only `equals` is supported right now; anything else falls back to "show".
+
+---
+
+## Fetching the component
+
+```bash
+greentic-component store fetch \
+  --out . \
+  oci://ghcr.io/greentic-ai/components/component-adaptive-card:latest
+```
+
+This downloads the component artifact locally.
+
+---
+
+## Local testing with greentic-component test
+
+Example test with two sequential steps and state dump:
+
+```bash
+greentic-component test \
+  --wasm ./component_adaptive_card.wasm \
+  --manifest ./component.manifest.json \
+  --op card --input-json '{
+    "card_source": "asset",
+    "card_spec": {
+      "asset_path": "card.json",
+      "template_params": {}
     },
-    "asset_registry": {
-      "onboarding": "assets/cards/onboarding.json"
+    "mode": "renderAndValidate",
+    "interaction": {
+      "enabled": true,
+      "type": "Submit",
+      "card_instance_id": "card-1",
+      "actions": [
+        {
+          "id": "save",
+          "title": "Save",
+          "data": {}
+        }
+      ],
+      "raw_inputs": { "comment": "Hello from state" }
     }
-  },
-  "payload": {
-    "user": { "name": "Ada", "tier": "pro" }
-  },
-  "mode": "renderAndValidate"
-}
+  }' \
+  --step --op card --input-json '{
+    "card_source": "asset",
+    "card_spec": {
+      "asset_path": "card2.json",
+      "template_params": {}
+    },
+    "mode": "renderAndValidate",
+    "interaction": {
+      "enabled": true,
+      "type": "Submit",
+      "card_instance_id": "card-1",
+      "actions": [
+        {
+          "id": "save",
+          "title": "Save",
+          "data": {}
+        }
+      ],
+      "raw_inputs": {}
+    }
+  }' \
+  --state-dump \
+  --pretty
 ```
 
-If you need to process an interaction from the host, include the `interaction` object in the input payload:
+---
 
-```json
-{
-  "interaction": {
-    "interaction_type": "Submit",
-    "action_id": "start",
-    "card_instance_id": "card-1",
-    "raw_inputs": { "agree": true },
-    "metadata": { "route": "next_step", "cardId": "onboarding" }
-  }
-}
-```
+## Authoring tips
 
-## Input reference
+- Use the **Adaptive Card Designer** to validate schema version and supported elements
+- Prefer schema **1.3** for cross-channel compatibility
+- Avoid host-specific features unless you target a single channel
 
-The component exposes one operation: `card`.
+---
 
-- `card_source`: `inline` (default), `asset`, or `catalog`.
-- `card_spec`:
-  - `inline_json`: Inline Adaptive Card JSON (object or array).
-  - `asset_path`: Direct path to a JSON file on disk.
-  - `catalog_name`: Logical name resolved to `<base>/<name>.json`.
-  - `template_params`: JSON object/array exposed to bindings as `params.*` or `template.*`.
-  - `asset_registry`: Optional map of logical names to paths (overrides env registry).
-- `node_id`: Optional node id used to scope persisted state and optional helpers.
-- `payload`: Explicit JSON input model used by binding/expression resolution.
-- `session`: Optional explicit session metadata (not injected by the runner).
-- `state`: Optional explicit state override (persistent state is loaded from state-store).
-- `interaction`: Optional interaction payload (see Interaction handling).
-- `mode`: `render`, `validate`, or `renderAndValidate` (default).
-- `envelope`: Optional `greentic_types::InvocationEnvelope` metadata.
+## Troubleshooting
 
-Defaults:
-- `card_source` defaults to `inline`.
-- `card_spec` defaults to `{ "inline_json": {} }`.
-- `mode` defaults to `renderAndValidate`.
-- `payload`, `session`, and `state` are treated as empty when omitted.
+### Card does not render
+- Verify schema version compatibility
+- Remove unsupported elements for the target host
+- Run with `mode=validate` and inspect validation output
 
-## Card sources and asset resolution
+### Actions do not trigger
+- Confirm correct action type (`Submit` vs `Execute`)
+- Verify provider routing and permissions
+- Check host limitations on interactive actions
 
-- **inline:** Uses `card_spec.inline_json`.
-- **asset:** Uses `card_spec.asset_path`, or resolves via registry/base path.
-- **catalog:** Resolves `catalog_name` to `<base>/<name>.json` after registry lookup.
+---
 
-Registry and base path:
-- `card_spec.asset_registry` takes precedence for both asset and catalog lookups.
-- `ADAPTIVE_CARD_ASSET_REGISTRY` can point to a JSON map on disk.
-- `ADAPTIVE_CARD_CATALOG_FILE` can point to a JSON map for catalog names.
-- `ADAPTIVE_CARD_ASSET_BASE` controls the base folder (default `assets`).
-- In wasm32 builds, on-disk loading requires filesystem read access and an appropriate mount; otherwise use the host asset resolver or inline JSON.
+## References
 
-## Bindings, expressions, and Handlebars
-
-The component traverses the card JSON and applies Handlebars first, then replaces placeholders:
-
-- `{{...}}`: Handlebars templates with access to `payload`, `state`, and optional `params`/`template`.
-- `@{path}`: Path lookup with typed replacement for whole-string values.
-- `@{path||default}`: Provides a default when the value is missing or null.
-- `${expr}`: Expression evaluation (whole-string only), supports dotted paths, `==`, and ternary `cond ? a : b`.
-- Embedded placeholders (inside larger strings) are replaced as strings.
-
-Resolution order for bare paths: `payload`, then `session`, then `state`, then `params`/`template`.
-
-### Handlebars context
-
-Handlebars receives this context:
-
-- `payload`: the explicit input payload (explicit access via `{{payload.foo}}`).
-- `state`: component-local persisted state loaded via `greentic:state/store@1.0.0` (or an explicit override).
-- `params`/`template`: `card_spec.template_params` when provided.
-- `payload` remains explicit and is not shadowed by implicit lookups.
-
-## Interaction handling
-
-When `interaction` is present, the component:
-
-- Emits an `event` describing the action (`Submit`, `Execute`, `OpenUrl`, `ShowCard`, `ToggleVisibility`).
-- Adds `state_updates` (legacy/compat; persistence uses state-store):
-  - `Submit`/`Execute`: merges into `form_data`.
-  - `ShowCard`: sets `ui.active_show_card.<card_instance_id>`.
-  - `ToggleVisibility`: sets `ui.visibility.<action_id>`.
-- Adds `session_updates` when `interaction.metadata.route` is set.
-
-## Output
-
-The result includes:
-
-- `rendered_card`: Canonical Adaptive Card JSON (omitted when `mode=validate`).
-- `event`: Optional interaction event metadata.
-- `state_updates` and `session_updates`: Declarative ops for the host (optional/legacy).
-- `card_features`: Feature summary (elements, actions, media, auth, etc).
-- `validation_issues`: Structural validation findings.
-
-## Validation
-
-Validation checks core Adaptive Card invariants (root type, version, element/action shape, input rules). Use `mode=validate` to skip rendering and return validation issues only.
-
-## Persistent state
-
-Persistent state is accessed via `greentic:state/store@1.0.0`. The component:
-
-- Reads state at the start of a render/interaction.
-- Applies interaction updates and writes the resulting state back.
-- Does not rely on runner-injected `state.*` snapshots.
-- Uses `node_id` (when provided) to scope the state key.
-
-## GHCR images
-
-This component publishes OCI artifacts to GHCR as:
-
-```
-ghcr.io/<org>/components/component-adaptive-card:<version>
-```
-
-`<version>` comes from `Cargo.toml`/`component.manifest.json` and is also tagged as `latest`.
-
-## Development
-
-Developer notes live in `dev.md`.
+- Adaptive Cards Explorer: https://adaptivecards.io/explorer/
+- Adaptive Card Designer: https://adaptivecards.io/designer/
+- Microsoft Teams Cards: https://learn.microsoft.com/microsoftteams/platform/task-modules-and-cards/cards/cards-reference
+- Webex Adaptive Cards: https://developer.webex.com/messaging/docs/buttons-and-cards

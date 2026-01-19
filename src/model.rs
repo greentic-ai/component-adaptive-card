@@ -73,6 +73,8 @@ pub enum CardInteractionType {
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct CardInteraction {
+    #[serde(default)]
+    pub enabled: Option<bool>,
     #[serde(alias = "interaction_type")]
     pub interaction_type: CardInteractionType,
     #[serde(alias = "action_id")]

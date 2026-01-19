@@ -150,6 +150,11 @@ pub fn handle_invocation(
     mut invocation: AdaptiveCardInvocation,
 ) -> Result<AdaptiveCardResult, ComponentError> {
     state_store::load_state_if_missing(&mut invocation, None)?;
+    if let Some(interaction) = invocation.interaction.as_ref()
+        && interaction.enabled == Some(false)
+    {
+        invocation.interaction = None;
+    }
     if invocation.interaction.is_some() {
         return handle_interaction(&invocation);
     }

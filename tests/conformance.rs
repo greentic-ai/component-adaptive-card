@@ -239,6 +239,7 @@ fn submit_interaction_emits_event_and_updates_state() {
     });
     let mut invocation = base_invocation(card);
     invocation.interaction = Some(CardInteraction {
+        enabled: None,
         interaction_type: CardInteractionType::Submit,
         action_id: "submit-1".to_string(),
         verb: None,
@@ -273,6 +274,7 @@ fn toggle_visibility_sets_state_flag() {
     });
     let mut invocation = base_invocation(card);
     invocation.interaction = Some(CardInteraction {
+        enabled: None,
         interaction_type: CardInteractionType::ToggleVisibility,
         action_id: "section-1".to_string(),
         verb: None,

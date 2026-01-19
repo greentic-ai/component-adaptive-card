@@ -52,6 +52,7 @@
       "type": "object",
       "required": ["interaction_type", "action_id", "card_instance_id"],
       "properties": {
+        "enabled": { "type": "boolean" },
         "interaction_type": {
           "type": "string",
           "enum": ["Submit", "Execute", "OpenUrl", "ShowCard", "ToggleVisibility"]
