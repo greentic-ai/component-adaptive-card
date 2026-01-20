@@ -1,7 +1,7 @@
 {
   "step": 1,
   "line_no": 17,
-  "command": "greentic-dev flow add-step --flow /tmp/gtest-cggTp1/flows/main.ygtc --node-id adaptive-card --operation card --payload {\"input\":{\"card_source\":\"asset\",\"card_spec\":{\"asset_path\":\"card.json\",\"template_params\":{}},\"mode\":\"renderAndValidate\"}} --component oci://ghcr.io/greentic-ai/components/component-adaptive-card:latest --after start",
+  "command": "greentic-dev flow add-step --flow /tmp/gtest-HdJKdq/flows/main.ygtc --node-id adaptive-card --operation card --payload {\"input\":{\"card_source\":\"asset\",\"card_spec\":{\"asset_path\":\"card.json\",\"template_params\":{}},\"mode\":\"renderAndValidate\"}} --component oci://ghcr.io/greentic-ai/components/component-adaptive-card:latest --after start",
   "exit_code": 0,
-  "duration_ms": 2361
+  "duration_ms": 143
 }

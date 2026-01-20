@@ -3,5 +3,5 @@
   "line_no": 8,
   "command": "greentic-component test --wasm ./component_adaptive_card.wasm --manifest ./component.manifest.json --op card --input-json {\"card_source\":\"catalog\",\"card_spec\":{\"catalog_name\":\"readme-card\",\"asset_registry\":{\"readme-card\":\"card.json\"},\"template_params\":{}},\"mode\":\"renderAndValidate\"}",
   "exit_code": 0,
-  "duration_ms": 8614
+  "duration_ms": 9866
 }
