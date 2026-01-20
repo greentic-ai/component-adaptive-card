@@ -24,8 +24,23 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: wasm32-wasip2
+      - name: Cache cargo binaries
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-bins-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-bins-
+      - name: Install cargo-binstall
+        run: |
+          if ! command -v cargo-binstall >/dev/null 2>&1; then
+            cargo install cargo-binstall --locked
+          fi
       - name: Install Greentic CLIs
-        run: cargo install greentic-component greentic-dev greentic-flow greentic-integration-tester --locked
+        run: cargo binstall -y greentic-component greentic-dev greentic-flow greentic-integration-tester
       - name: Build WASM (release)
         run: cargo build --target wasm32-wasip2 --release
       - name: Generate matrix gtests
