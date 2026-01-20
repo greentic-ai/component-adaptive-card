@@ -1,25 +1,16 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Adaptive Card invocation input",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Adaptive Card invocation v1",
   "type": "object",
   "required": ["card_spec"],
   "properties": {
-    "envelope": {
-      "description": "Optional Greentic invocation envelope metadata.",
-      "type": "object"
-    },
     "card_source": {
       "type": "string",
       "enum": ["inline", "asset", "catalog"],
-      "default": "inline",
-      "description": "Where to load the card from."
+      "default": "inline"
     },
     "card_spec": {
       "type": "object",
-      "description": "Details for resolving the card source.",
-      "default": {
-        "inline_json": {}
-      },
       "properties": {
         "inline_json": { "type": ["object", "array"] },
         "asset_path": { "type": "string" },
@@ -27,26 +18,19 @@
         "template_params": { "type": ["object", "array"] },
         "asset_registry": {
           "type": "object",
-          "additionalProperties": { "type": "string" },
-          "description": "Optional mapping of asset or catalog names to concrete paths."
+          "additionalProperties": { "type": "string" }
         }
       }
     },
-    "node_id": {
-      "type": "string",
-      "description": "Optional node id used to scope persisted state and helper context."
-    },
+    "node_id": { "type": "string" },
     "payload": {
-      "type": ["object", "array", "null"],
-      "description": "Explicit input payload used for binding/expression resolution."
+      "type": ["object", "array", "null"]
     },
     "session": {
-      "type": ["object", "array", "null"],
-      "description": "Optional explicit session metadata (not injected by the runner)."
+      "type": ["object", "array", "null"]
     },
     "state": {
-      "type": ["object", "array", "null"],
-      "description": "Optional explicit state override (persistent state uses state-store)."
+      "type": ["object", "array", "null"]
     },
     "interaction": {
       "type": "object",
@@ -67,14 +51,15 @@
     "mode": {
       "type": "string",
       "enum": ["render", "validate", "renderAndValidate"],
-      "default": "renderAndValidate",
-      "description": "Whether to render, validate only, or both."
+      "default": "renderAndValidate"
     },
     "validation_mode": {
       "type": "string",
       "enum": ["off", "warn", "error"],
-      "default": "warn",
-      "description": "How to handle invocation schema validation issues."
+      "default": "warn"
+    },
+    "envelope": {
+      "type": "object"
     }
   }
 }

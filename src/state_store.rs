@@ -46,6 +46,13 @@ pub fn persist_state(
     write_state(&key, bytes)
 }
 
+pub fn state_key_for(
+    inv: &AdaptiveCardInvocation,
+    interaction: Option<&CardInteraction>,
+) -> String {
+    state_key(inv, interaction)
+}
+
 pub fn apply_updates(state: &mut Value, updates: &[StateUpdateOp]) {
     for update in updates {
         match update {
@@ -251,7 +258,9 @@ fn is_not_found(code: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::{AdaptiveCardInvocation, CardSource, CardSpec, InvocationMode};
+    use crate::model::{
+        AdaptiveCardInvocation, CardSource, CardSpec, InvocationMode, ValidationMode,
+    };
     use serde_json::json;
 
     fn base_invocation() -> AdaptiveCardInvocation {
@@ -267,6 +276,7 @@ mod tests {
             state: Value::Null,
             interaction: None,
             mode: InvocationMode::RenderAndValidate,
+            validation_mode: ValidationMode::Warn,
             envelope: None,
         }
     }

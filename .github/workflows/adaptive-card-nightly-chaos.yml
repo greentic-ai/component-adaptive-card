@@ -1,0 +1,51 @@
+name: Adaptive Card Nightly Chaos
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  nightly-chaos:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        seed: [101, 202]
+    env:
+      GREENTIC_FAIL_ASSET_TRANSIENT: "1/5"
+      GREENTIC_FAIL_DELAY_STATE_READ_MS: "50"
+      GREENTIC_FAIL_DUPLICATE_INTERACTION: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-wasip2
+      - name: Install Greentic CLIs
+        run: cargo install greentic-component greentic-dev greentic-flow greentic-integration-tester --locked
+      - name: Build WASM (release)
+        run: cargo build --target wasm32-wasip2 --release
+      - name: Generate matrix gtests
+        run: ./tests/tools/gen_matrix --mode full
+      - name: Run nightly chaos suite
+        id: run-chaos
+        run: |
+          set -euo pipefail
+          DATE=$(date -u +%Y-%m-%d)
+          SEED="${{ matrix.seed }}"
+          CORPUS_DIR="corpus/${DATE}/${SEED}"
+          mkdir -p "${CORPUS_DIR}"
+          echo "corpus_dir=${CORPUS_DIR}" >> "$GITHUB_OUTPUT"
+          echo "seed=${SEED}" >> "$GITHUB_OUTPUT"
+          echo "Replay: greentic-integration-tester run --gtest tests/gtests --artifacts-dir ${CORPUS_DIR} --seed ${SEED}" > "${CORPUS_DIR}/replay.txt"
+          greentic-integration-tester run --gtest tests/gtests/matrix --artifacts-dir "${CORPUS_DIR}/matrix" --seed "${SEED}"
+          greentic-integration-tester run --gtest tests/gtests/negative --artifacts-dir "${CORPUS_DIR}/negative" --seed "${SEED}"
+      - name: Upload failure corpus
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: adaptive-card-failure-corpus-${{ matrix.seed }}
+          path: ${{ steps.run-chaos.outputs.corpus_dir }}

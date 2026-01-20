@@ -1,0 +1,6 @@
+#SET OUT=${WORK_DIR}/catalog_render.json
+#RUN greentic-component test --wasm ${REPO_ROOT}/target/wasm32-wasip2/release/component_adaptive_card.wasm --manifest ${REPO_ROOT}/component.manifest.json --op card --input-json '{"card_source":"catalog","card_spec":{"catalog_name":"readme-card","asset_registry":{"readme-card":"${REPO_ROOT}/card.json"},"template_params":{}},"mode":"renderAndValidate"}'
+#EXPECT_EXIT 0
+#CAPTURE_JSON > ${OUT}
+#EXPECT_JSONPATH ${OUT} validation_issues equals []
+#SAVE_ARTIFACT ${OUT}

@@ -1,0 +1,7 @@
+#SET OUT=${WORK_DIR}/invalid_interaction_type.json
+#RUN greentic-component test --wasm ${REPO_ROOT}/target/wasm32-wasip2/release/component_adaptive_card.wasm --manifest ${REPO_ROOT}/component.manifest.json --op card --input-json '{"card_spec":{"inline_json":{}},"validation_mode":"error","interaction":{"interaction_type":123,"action_id":"go","card_instance_id":"card-1"}}'
+#EXPECT_EXIT 0
+#CAPTURE_JSON > ${OUT}
+#EXPECT_JSONPATH ${OUT} error.code equals AC_SCHEMA_INVALID
+#EXPECT_JSONPATH ${OUT} error.details.validation_issues[*].code contains AC_INVOCATION_INVALID_TYPE
+#SAVE_ARTIFACT ${OUT}

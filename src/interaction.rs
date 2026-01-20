@@ -7,6 +7,7 @@ use crate::model::{
 };
 use crate::render::render_card;
 use crate::state_store;
+use crate::trace;
 
 pub fn handle_interaction(
     inv: &AdaptiveCardInvocation,
@@ -15,9 +16,20 @@ pub fn handle_interaction(
         .interaction
         .clone()
         .ok_or_else(|| ComponentError::InvalidInput("interaction is required".into()))?;
+    if interaction.action_id.trim().is_empty() {
+        return Err(ComponentError::InteractionInvalid(
+            "interaction.action_id is required".into(),
+        ));
+    }
+    if interaction.card_instance_id.trim().is_empty() {
+        return Err(ComponentError::InteractionInvalid(
+            "interaction.card_instance_id is required".into(),
+        ));
+    }
 
     let mut invocation = inv.clone();
-    state_store::load_state_if_missing(&mut invocation, Some(&interaction))?;
+    let state_loaded = state_store::load_state_if_missing(&mut invocation, Some(&interaction))?;
+    let state_read_hash = state_loaded.as_ref().and_then(trace::hash_value);
     let resolved = render_card(&invocation)?;
     let normalized_inputs = normalize_inputs(&interaction.raw_inputs);
     let mut state_updates = Vec::new();
@@ -106,7 +118,22 @@ pub fn handle_interaction(
         invocation.state.clone()
     };
     state_store::apply_updates(&mut persisted_state, &state_updates);
+    let state_write_hash = trace::hash_value(&persisted_state);
     state_store::persist_state(&invocation, Some(&interaction), &persisted_state)?;
+
+    let mut telemetry_events = Vec::new();
+    if trace::trace_enabled() {
+        let state_key = Some(state_store::state_key_for(&invocation, Some(&interaction)));
+        telemetry_events.push(trace::build_trace_event(
+            &invocation,
+            &resolved.asset_resolution,
+            &resolved.binding_summary,
+            Some(&interaction),
+            state_key,
+            state_read_hash,
+            state_write_hash,
+        ));
+    }
 
     Ok(AdaptiveCardResult {
         rendered_card: Some(resolved.card),
@@ -115,7 +142,7 @@ pub fn handle_interaction(
         session_updates,
         card_features: resolved.features,
         validation_issues: resolved.validation_issues,
-        telemetry_events: Vec::new(),
+        telemetry_events,
     })
 }
 

@@ -1,0 +1,22 @@
+#SET FLOW=${WORK_DIR}/flows/main.ygtc
+#MKDIR ${WORK_DIR}/flows
+#WRITE ${FLOW} <<<EOF
+id: main
+type: messaging
+start: start
+nodes:
+  start:
+    op: {}
+    routing:
+      - to: end
+  end:
+    op: {}
+    routing:
+      - out: true
+EOF
+#RUN greentic-dev flow add-step --flow ${FLOW} --node-id adaptive-card --operation card --payload '{"input":{"card_source":"asset","card_spec":{"asset_path":"card.json","template_params":{}},"mode":"renderAndValidate"}}' --local-wasm ${REPO_ROOT}/target/wasm32-wasip2/release/component_adaptive_card.wasm --after start
+#EXPECT_EXIT 0
+#RUN greentic-dev flow doctor ${FLOW}
+#EXPECT_EXIT 0
+#SAVE_ARTIFACT ${FLOW}
+#SAVE_ARTIFACT ${FLOW}.resolve.json

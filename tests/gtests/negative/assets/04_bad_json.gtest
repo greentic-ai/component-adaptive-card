@@ -1,0 +1,12 @@
+#SET OUT=${WORK_DIR}/bad_json.json
+#SET BAD=${WORK_DIR}/bad_card.json
+#WRITE ${BAD} <<<EOF
+{ "type": "AdaptiveCard", "version": }
+EOF
+#RUN greentic-component test --wasm ${REPO_ROOT}/target/wasm32-wasip2/release/component_adaptive_card.wasm --manifest ${REPO_ROOT}/component.manifest.json --op card --input-json '{"card_source":"asset","card_spec":{"asset_path":"${BAD}","template_params":{}}}'
+#EXPECT_EXIT 0
+#CAPTURE_JSON > ${OUT}
+#EXPECT_JSONPATH ${OUT} error.code equals AC_ASSET_PARSE_ERROR
+#EXPECT_JSONPATH ${OUT} error.details.validation_issues[*].code contains AC_ASSET_PARSE_ERROR
+#SAVE_ARTIFACT ${OUT}
+#SAVE_ARTIFACT ${BAD}

@@ -1,0 +1,53 @@
+name: Adaptive Card PR Gate
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/adaptive-card-pr-gate.yml"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "README.md"
+      - "component.manifest.json"
+      - "schemas/**"
+      - "src/**"
+      - "tests/**"
+
+permissions:
+  contents: read
+
+jobs:
+  pr-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-wasip2
+      - name: Install Greentic CLIs
+        run: cargo install greentic-component greentic-dev greentic-flow greentic-integration-tester --locked
+      - name: Build WASM (release)
+        run: cargo build --target wasm32-wasip2 --release
+      - name: Generate matrix pairwise gtests
+        run: ./tests/tools/gen_matrix --mode pairwise
+      - name: Run Adaptive Card gtests
+        run: |
+          set -euo pipefail
+          run_gtest() {
+            local path="$1"
+            local artifacts="$2"
+            if [ -d "$path" ] && find "$path" -name "*.gtest" -print -quit | grep -q .; then
+              greentic-integration-tester run --gtest "$path" --artifacts-dir "$artifacts"
+            else
+              echo "No .gtest files under $path; skipping."
+            fi
+          }
+          mkdir -p artifacts/readme artifacts/matrix artifacts/negative
+          run_gtest "tests/gtests/README" "artifacts/readme"
+          run_gtest "tests/gtests/matrix/pairwise" "artifacts/matrix"
+          run_gtest "tests/gtests/negative/smoke" "artifacts/negative"
+      - name: Upload gtest artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: adaptive-card-gtest-artifacts
+          path: artifacts

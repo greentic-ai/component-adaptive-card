@@ -1,6 +1,6 @@
 use component_adaptive_card::{
     AdaptiveCardInvocation, CardInteraction, CardInteractionType, CardSource, CardSpec,
-    InvocationMode, handle_invocation, register_host_asset_callback,
+    InvocationMode, ValidationMode, handle_invocation, register_host_asset_callback,
 };
 use serde_json::json;
 use std::fs;
@@ -21,6 +21,7 @@ fn base_invocation(card: serde_json::Value) -> AdaptiveCardInvocation {
         state: json!({}),
         interaction: None,
         mode: InvocationMode::RenderAndValidate,
+        validation_mode: ValidationMode::Warn,
         envelope: None,
     }
 }
@@ -122,6 +123,7 @@ fn asset_render_loads_card() {
         state: json!({}),
         interaction: None,
         mode: InvocationMode::RenderAndValidate,
+        validation_mode: ValidationMode::Warn,
         envelope: None,
     };
 
@@ -162,6 +164,7 @@ fn catalog_resolution_uses_env_mapping() {
         state: json!({}),
         interaction: None,
         mode: InvocationMode::RenderAndValidate,
+        validation_mode: ValidationMode::Warn,
         envelope: None,
     };
 
@@ -385,6 +388,7 @@ fn host_asset_registry_resolves_assets() {
         state: json!({}),
         interaction: None,
         mode: InvocationMode::RenderAndValidate,
+        validation_mode: ValidationMode::Warn,
         envelope: None,
     };
 

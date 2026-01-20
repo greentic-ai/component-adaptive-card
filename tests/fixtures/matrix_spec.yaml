@@ -1,0 +1,14 @@
+{
+  "pairwise_count": 30,
+  "axes": {
+    "card_source": ["inline", "asset", "catalog"],
+    "mode": ["render", "validate", "renderAndValidate"],
+    "bindings": ["handlebars", "at_path", "defaults", "expr", "mixed"],
+    "assets": ["registry", "env", "missing"],
+    "interaction": ["none", "submit", "showcard", "toggle"],
+    "node_id": ["none", "present"]
+  },
+  "constraints": {
+    "exclude": []
+  }
+}

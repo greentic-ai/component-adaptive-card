@@ -5,6 +5,8 @@ mod interaction;
 mod model;
 mod render;
 mod state_store;
+mod trace;
+mod validation;
 
 pub use asset_resolver::{
     register_host_asset_callback, register_host_asset_map, register_host_asset_resolver,
@@ -130,26 +132,72 @@ pub fn describe_payload() -> String {
 }
 
 pub fn handle_message(operation: &str, input: &str) -> String {
-    match parse_invocation(input) {
-        Ok(mut invocation) => {
-            // Allow the operation name to steer mode selection if the host provides it.
-            if operation.eq_ignore_ascii_case("validate") {
-                invocation.mode = InvocationMode::Validate;
-            }
-            match handle_invocation(invocation) {
-                Ok(result) => serde_json::to_string(&result)
-                    .unwrap_or_else(|err| error_payload(&format!("serialization error: {err}"))),
-                Err(err) => error_payload(&err.to_string()),
-            }
+    let value: serde_json::Value = match serde_json::from_str(input) {
+        Ok(value) => value,
+        Err(err) => {
+            return error_payload(
+                "AC_SCHEMA_INVALID",
+                "invalid JSON",
+                Some(serde_json::Value::String(err.to_string())),
+            );
         }
-        Err(err) => error_payload(&format!("invalid invocation: {err}")),
+    };
+    let invocation_value =
+        validation::locate_invocation_candidate(&value).unwrap_or_else(|| value.clone());
+    let validation_mode = read_validation_mode(&value, &invocation_value);
+    let mut validation_issues = if validation_mode == ValidationMode::Off {
+        Vec::new()
+    } else {
+        validation::validate_invocation_schema(&invocation_value)
+    };
+    if validation_mode == ValidationMode::Error && !validation_issues.is_empty() {
+        return validation_error_payload(&validation_issues, None);
+    }
+
+    let mut invocation = match parse_invocation_value(&value) {
+        Ok(invocation) => invocation,
+        Err(err) => {
+            if !validation_issues.is_empty() {
+                return validation_error_payload(&validation_issues, Some(&err.to_string()));
+            }
+            return error_payload(
+                "AC_SCHEMA_INVALID",
+                "invalid invocation",
+                Some(serde_json::Value::String(err.to_string())),
+            );
+        }
+    };
+    // Allow the operation name to steer mode selection if the host provides it.
+    if operation.eq_ignore_ascii_case("validate") {
+        invocation.mode = InvocationMode::Validate;
+    }
+    match handle_invocation(invocation) {
+        Ok(mut result) => {
+            if validation_mode != ValidationMode::Off {
+                result.validation_issues.append(&mut validation_issues);
+            }
+            serde_json::to_string(&result).unwrap_or_else(|err| {
+                error_payload(
+                    "AC_INTERNAL_ERROR",
+                    "serialization error",
+                    Some(serde_json::Value::String(err.to_string())),
+                )
+            })
+        }
+        Err(err) => {
+            if !validation_issues.is_empty() {
+                return validation_error_payload(&validation_issues, Some(&err.to_string()));
+            }
+            error_payload_from_error(&err)
+        }
     }
 }
 
 pub fn handle_invocation(
     mut invocation: AdaptiveCardInvocation,
 ) -> Result<AdaptiveCardResult, ComponentError> {
-    state_store::load_state_if_missing(&mut invocation, None)?;
+    let state_loaded = state_store::load_state_if_missing(&mut invocation, None)?;
+    let state_read_hash = state_loaded.as_ref().and_then(trace::hash_value);
     if let Some(interaction) = invocation.interaction.as_ref()
         && interaction.enabled == Some(false)
     {
@@ -160,10 +208,28 @@ pub fn handle_invocation(
     }
 
     let rendered = render_card(&invocation)?;
+    if invocation.validation_mode == ValidationMode::Error && !rendered.validation_issues.is_empty()
+    {
+        return Err(ComponentError::CardValidation(rendered.validation_issues));
+    }
     let rendered_card = match invocation.mode {
         InvocationMode::Validate => None,
         InvocationMode::Render | InvocationMode::RenderAndValidate => Some(rendered.card),
     };
+
+    let mut telemetry_events = Vec::new();
+    if trace::trace_enabled() {
+        let state_key = Some(state_store::state_key_for(&invocation, None));
+        telemetry_events.push(trace::build_trace_event(
+            &invocation,
+            &rendered.asset_resolution,
+            &rendered.binding_summary,
+            None,
+            state_key,
+            state_read_hash,
+            None,
+        ));
+    }
 
     Ok(AdaptiveCardResult {
         rendered_card,
@@ -172,7 +238,7 @@ pub fn handle_invocation(
         session_updates: Vec::new(),
         card_features: rendered.features,
         validation_issues: rendered.validation_issues,
-        telemetry_events: Vec::new(),
+        telemetry_events,
     })
 }
 
@@ -191,30 +257,34 @@ struct InvocationEnvelope {
     #[serde(default)]
     mode: Option<InvocationMode>,
     #[serde(default)]
+    #[serde(alias = "validationMode")]
+    validation_mode: Option<ValidationMode>,
+    #[serde(default)]
     node_id: Option<String>,
     #[serde(default)]
     envelope: Option<greentic_types::InvocationEnvelope>,
 }
 
-fn parse_invocation(input: &str) -> Result<AdaptiveCardInvocation, ComponentError> {
-    let value: serde_json::Value = serde_json::from_str(input)?;
-    if let Some(invocation_value) = find_invocation_value(&value) {
+fn parse_invocation_value(
+    value: &serde_json::Value,
+) -> Result<AdaptiveCardInvocation, ComponentError> {
+    if let Some(invocation_value) = validation::locate_invocation_candidate(value) {
         return serde_json::from_value::<AdaptiveCardInvocation>(invocation_value)
             .map_err(ComponentError::Serde);
     }
 
     if let Some(inner) = value.get("config") {
         if let Ok(invocation) = serde_json::from_value::<AdaptiveCardInvocation>(inner.clone()) {
-            return merge_envelope(invocation, &value);
+            return merge_envelope(invocation, value);
         }
         if let Some(card) = inner.get("card")
             && let Ok(invocation) = serde_json::from_value::<AdaptiveCardInvocation>(card.clone())
         {
-            return merge_envelope(invocation, &value);
+            return merge_envelope(invocation, value);
         }
     }
 
-    let mut env: InvocationEnvelope = serde_json::from_value(value)?;
+    let mut env: InvocationEnvelope = serde_json::from_value(value.clone())?;
     if env.config.is_none()
         && let Ok(invocation) =
             serde_json::from_value::<AdaptiveCardInvocation>(env.payload.clone())
@@ -261,44 +331,17 @@ fn merge_envelope(
     {
         inv.mode = parsed;
     }
+    if let Some(mode_value) = env
+        .get("validation_mode")
+        .or_else(|| env.get("validationMode"))
+        && let Some(parsed) = parse_validation_mode(mode_value)
+    {
+        inv.validation_mode = parsed;
+    }
     if let Some(envelope) = env.get("envelope") {
         inv.envelope = serde_json::from_value(envelope.clone()).ok();
     }
     Ok(inv)
-}
-
-fn find_invocation_value(value: &serde_json::Value) -> Option<serde_json::Value> {
-    let obj = value.as_object()?;
-    if obj.contains_key("card_source") || obj.contains_key("card_spec") {
-        return Some(value.clone());
-    }
-    if let Some(inv) = obj.get("invocation") {
-        return Some(inv.clone());
-    }
-    if let Some(card) = obj.get("card") {
-        return Some(card.clone());
-    }
-    if let Some(payload) = obj.get("payload")
-        && payload
-            .as_object()
-            .map(|p| p.contains_key("card_source") || p.contains_key("card_spec"))
-            .unwrap_or(false)
-    {
-        return Some(payload.clone());
-    }
-    if let Some(config) = obj.get("config") {
-        if config
-            .as_object()
-            .map(|c| c.contains_key("card_source") || c.contains_key("card_spec"))
-            .unwrap_or(false)
-        {
-            return Some(config.clone());
-        }
-        if let Some(card) = config.get("card") {
-            return Some(card.clone());
-        }
-    }
-    None
 }
 
 fn merge_envelope_struct(
@@ -328,12 +371,150 @@ fn merge_envelope_struct(
     if let Some(mode) = env.mode {
         inv.mode = mode;
     }
+    if let Some(mode) = env.validation_mode {
+        inv.validation_mode = mode;
+    }
     if env.envelope.is_some() {
         inv.envelope = env.envelope;
     }
     inv
 }
 
-fn error_payload(message: &str) -> String {
-    serde_json::json!({ "error": message }).to_string()
+fn error_payload(code: &str, message: &str, details: Option<serde_json::Value>) -> String {
+    let mut payload = serde_json::Map::new();
+    payload.insert(
+        "code".to_string(),
+        serde_json::Value::String(code.to_string()),
+    );
+    payload.insert(
+        "message".to_string(),
+        serde_json::Value::String(message.to_string()),
+    );
+    if let Some(details) = details {
+        payload.insert("details".to_string(), details);
+    }
+    serde_json::json!({ "error": payload }).to_string()
+}
+
+fn validation_error_payload(issues: &[ValidationIssue], detail: Option<&str>) -> String {
+    let mut message = "invocation schema validation failed".to_string();
+    if let Some(detail) = detail {
+        message = format!("{message}: {detail}");
+    }
+    let details = serde_json::json!({ "validation_issues": issues });
+    error_payload("AC_SCHEMA_INVALID", &message, Some(details))
+}
+
+fn error_payload_from_error(err: &ComponentError) -> String {
+    let issue_details = |code: &str, message: String, path: &str| {
+        serde_json::json!({
+            "validation_issues": [{
+                "code": code,
+                "message": message,
+                "path": path
+            }]
+        })
+    };
+    match err {
+        ComponentError::InvalidInput(message) => error_payload(
+            "AC_SCHEMA_INVALID",
+            "invalid input",
+            Some(issue_details("AC_SCHEMA_INVALID", message.clone(), "/")),
+        ),
+        ComponentError::Serde(inner) => error_payload(
+            "AC_SCHEMA_INVALID",
+            "invalid input",
+            Some(issue_details("AC_SCHEMA_INVALID", inner.to_string(), "/")),
+        ),
+        ComponentError::Io(inner) => error_payload(
+            "AC_SCHEMA_INVALID",
+            "io error",
+            Some(issue_details("AC_SCHEMA_INVALID", inner.to_string(), "/")),
+        ),
+        ComponentError::AssetNotFound(path) => error_payload(
+            "AC_ASSET_NOT_FOUND",
+            "asset not found",
+            Some(issue_details(
+                "AC_ASSET_NOT_FOUND",
+                path.clone(),
+                "/card_spec",
+            )),
+        ),
+        ComponentError::AssetParse(message) => error_payload(
+            "AC_ASSET_PARSE_ERROR",
+            "asset parse error",
+            Some(issue_details(
+                "AC_ASSET_PARSE_ERROR",
+                message.clone(),
+                "/card_spec",
+            )),
+        ),
+        ComponentError::Asset(message) => error_payload(
+            "AC_ASSET_NOT_FOUND",
+            "asset error",
+            Some(issue_details(
+                "AC_ASSET_NOT_FOUND",
+                message.clone(),
+                "/card_spec",
+            )),
+        ),
+        ComponentError::Binding(message) => error_payload(
+            "AC_BINDING_EVAL_ERROR",
+            "binding evaluation error",
+            Some(issue_details(
+                "AC_BINDING_EVAL_ERROR",
+                message.clone(),
+                "/card_spec/inline_json",
+            )),
+        ),
+        ComponentError::CardValidation(issues) => {
+            let details = serde_json::json!({ "validation_issues": issues });
+            error_payload(
+                "AC_CARD_VALIDATION_FAILED",
+                "card validation failed",
+                Some(details),
+            )
+        }
+        ComponentError::InteractionInvalid(message) => error_payload(
+            "AC_INTERACTION_INVALID",
+            "interaction invalid",
+            Some(issue_details(
+                "AC_INTERACTION_INVALID",
+                message.clone(),
+                "/interaction",
+            )),
+        ),
+        ComponentError::StateStore(message) => error_payload(
+            "AC_SCHEMA_INVALID",
+            "state store error",
+            Some(issue_details(
+                "AC_SCHEMA_INVALID",
+                message.clone(),
+                "/state",
+            )),
+        ),
+    }
+}
+
+fn read_validation_mode(
+    value: &serde_json::Value,
+    invocation_value: &serde_json::Value,
+) -> ValidationMode {
+    invocation_value
+        .get("validation_mode")
+        .or_else(|| invocation_value.get("validationMode"))
+        .or_else(|| value.get("validation_mode"))
+        .or_else(|| value.get("validationMode"))
+        .and_then(parse_validation_mode)
+        .unwrap_or_default()
+}
+
+fn parse_validation_mode(value: &serde_json::Value) -> Option<ValidationMode> {
+    let raw = value.as_str()?.to_ascii_lowercase();
+    match raw.as_str() {
+        "off" => Some(ValidationMode::Off),
+        "warn" => Some(ValidationMode::Warn),
+        "error" => Some(ValidationMode::Error),
+        _ => None,
+    }
 }

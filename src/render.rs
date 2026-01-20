@@ -11,19 +11,37 @@ use crate::model::{
     AdaptiveCardInvocation, CardFeatureSummary, CardSource, CardSpec, ValidationIssue,
 };
 
+#[derive(Debug, Default, Clone)]
+pub struct BindingSummary {
+    pub handlebars_expansions: u64,
+    pub placeholder_replacements: u64,
+    pub expression_evaluations: u64,
+    pub missing_paths: u64,
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct AssetResolution {
+    pub mode: String,
+    pub resolved: Option<String>,
+    pub hash: Option<String>,
+}
+
 #[derive(Debug)]
 pub struct RenderOutcome {
     pub card: Value,
     pub features: CardFeatureSummary,
     pub validation_issues: Vec<ValidationIssue>,
+    pub asset_resolution: AssetResolution,
+    pub binding_summary: BindingSummary,
 }
 
 pub fn render_card(inv: &AdaptiveCardInvocation) -> Result<RenderOutcome, ComponentError> {
-    let mut card = resolve_card(inv)?;
-    apply_handlebars(&mut card, inv)?;
+    let mut summary = BindingSummary::default();
+    let (mut card, asset_resolution) = resolve_card(inv)?;
+    apply_handlebars(&mut card, inv, &mut summary)?;
     let ctx = BindingContext::from_invocation(inv);
     let engine = SimpleExpressionEngine;
-    apply_bindings(&mut card, &ctx, &engine);
+    apply_bindings(&mut card, &ctx, &engine, &mut summary)?;
 
     let features = analyze_features(&card);
     let validation_issues = validate_card(&card);
@@ -32,16 +50,28 @@ pub fn render_card(inv: &AdaptiveCardInvocation) -> Result<RenderOutcome, Compon
         card,
         features,
         validation_issues,
+        asset_resolution,
+        binding_summary: summary,
     })
 }
 
-fn resolve_card(inv: &AdaptiveCardInvocation) -> Result<Value, ComponentError> {
+fn resolve_card(inv: &AdaptiveCardInvocation) -> Result<(Value, AssetResolution), ComponentError> {
     match inv.card_source {
-        CardSource::Inline => inv
-            .card_spec
-            .inline_json
-            .clone()
-            .ok_or_else(|| ComponentError::InvalidInput("inline_json is required".into())),
+        CardSource::Inline => {
+            let card =
+                inv.card_spec.inline_json.clone().ok_or_else(|| {
+                    ComponentError::InvalidInput("inline_json is required".into())
+                })?;
+            let hash = hash_json(&card);
+            Ok((
+                card,
+                AssetResolution {
+                    mode: "inline".to_string(),
+                    resolved: None,
+                    hash,
+                },
+            ))
+        }
         CardSource::Asset => {
             let path = inv
                 .card_spec
@@ -177,20 +207,37 @@ fn asset_base_path() -> String {
     std::env::var("ADAPTIVE_CARD_ASSET_BASE").unwrap_or_else(|_| "assets".to_string())
 }
 
-fn load_card_from_path(path: &str) -> Result<Value, ComponentError> {
-    let content = std::fs::read_to_string(path)?;
-    let json: Value = serde_json::from_str(&content)?;
-    Ok(json)
+fn load_card_from_path(path: &str) -> Result<(Value, String), ComponentError> {
+    let content = std::fs::read_to_string(path).map_err(|err| {
+        if err.kind() == std::io::ErrorKind::NotFound {
+            ComponentError::AssetNotFound(path.to_string())
+        } else {
+            ComponentError::Io(err)
+        }
+    })?;
+    let json: Value = serde_json::from_str(&content)
+        .map_err(|err| ComponentError::AssetParse(format!("{path}: {err}")))?;
+    let hash = hash_bytes(content.as_bytes());
+    Ok((json, hash))
 }
 
 fn load_with_candidates(
     lookup_key: &str,
     candidates: Vec<String>,
-) -> Result<Value, ComponentError> {
+) -> Result<(Value, AssetResolution), ComponentError> {
     let mut last_err: Option<ComponentError> = None;
     for candidate in candidates {
         match load_card_from_path(&candidate) {
-            Ok(card) => return Ok(card),
+            Ok((card, hash)) => {
+                return Ok((
+                    card,
+                    AssetResolution {
+                        mode: "wasm".to_string(),
+                        resolved: Some(candidate),
+                        hash: Some(hash),
+                    },
+                ));
+            }
             Err(err) => last_err = Some(err),
         }
     }
@@ -199,7 +246,16 @@ fn load_with_candidates(
         resolve_with_host(lookup_key).map_err(|e| ComponentError::Asset(e.message))?
     {
         match load_card_from_path(&host) {
-            Ok(card) => return Ok(card),
+            Ok((card, hash)) => {
+                return Ok((
+                    card,
+                    AssetResolution {
+                        mode: "host".to_string(),
+                        resolved: Some(host),
+                        hash: Some(hash),
+                    },
+                ));
+            }
             Err(err) => last_err = Some(err),
         }
     }
@@ -304,70 +360,105 @@ where
     Some(current.clone())
 }
 
-fn apply_bindings(value: &mut Value, ctx: &BindingContext, engine: &dyn ExpressionEngine) {
+fn apply_bindings(
+    value: &mut Value,
+    ctx: &BindingContext,
+    engine: &dyn ExpressionEngine,
+    summary: &mut BindingSummary,
+) -> Result<(), ComponentError> {
     match value {
         Value::String(text) => {
-            if let Some(path) = extract_single_placeholder(text)
-                && let Some(resolved) = ctx.lookup(path)
-            {
-                *value = resolved;
-                return;
+            if let Some(expr) = extract_expression(text) {
+                if is_simple_expression(expr) {
+                    if let Some(resolved) = ctx.lookup(expr) {
+                        *value = resolved;
+                        summary.placeholder_replacements += 1;
+                        return Ok(());
+                    }
+                    summary.missing_paths += 1;
+                    return Err(ComponentError::Binding(format!(
+                        "missing binding path: {expr}"
+                    )));
+                }
+                if let Some(resolved) = engine.eval(expr, ctx) {
+                    *value = match resolved {
+                        Value::String(_) => resolved,
+                        other => Value::String(stringify_value(&other)),
+                    };
+                    summary.expression_evaluations += 1;
+                    return Ok(());
+                }
+                summary.missing_paths += 1;
+                return Err(ComponentError::Binding(format!(
+                    "invalid expression: {expr}"
+                )));
             }
-            if let Some(expr) = extract_expression(text)
-                && let Some(resolved) = engine.eval(expr, ctx)
-            {
-                *value = match resolved {
-                    Value::String(_) => resolved,
-                    other => Value::String(stringify_value(&other)),
-                };
-                return;
+            if let Some(path) = extract_single_placeholder(text) {
+                if let Some(resolved) = ctx.lookup(path) {
+                    *value = resolved;
+                    summary.placeholder_replacements += 1;
+                    return Ok(());
+                }
+                summary.missing_paths += 1;
+                return Err(ComponentError::Binding(format!(
+                    "missing binding path: {path}"
+                )));
             }
-            let replaced = replace_placeholders(text, ctx);
+            let replaced = replace_placeholders(text, ctx, summary)?;
             *value = Value::String(replaced);
+            Ok(())
         }
         Value::Array(items) => {
             for item in items {
-                apply_bindings(item, ctx, engine);
+                apply_bindings(item, ctx, engine, summary)?;
             }
+            Ok(())
         }
         Value::Object(map) => {
             for entry in map.values_mut() {
-                apply_bindings(entry, ctx, engine);
+                apply_bindings(entry, ctx, engine, summary)?;
             }
+            Ok(())
         }
-        _ => {}
+        _ => Ok(()),
     }
 }
 
-fn apply_handlebars(value: &mut Value, inv: &AdaptiveCardInvocation) -> Result<(), ComponentError> {
+fn apply_handlebars(
+    value: &mut Value,
+    inv: &AdaptiveCardInvocation,
+    summary: &mut BindingSummary,
+) -> Result<(), ComponentError> {
     let mut engine = Handlebars::new();
     engine.set_strict_mode(false);
     let context = build_handlebars_context(inv);
-    render_handlebars_value(value, &engine, &context)
+    render_handlebars_value(value, &engine, &context, summary)
 }
 
 fn render_handlebars_value(
     value: &mut Value,
     engine: &Handlebars<'_>,
     context: &Value,
+    summary: &mut BindingSummary,
 ) -> Result<(), ComponentError> {
     match value {
         Value::String(text) => {
             let rendered = engine
                 .render_template(text, context)
-                .map_err(|err| ComponentError::InvalidInput(format!("handlebars: {err}")))?;
+                .map_err(|err| ComponentError::Binding(format!("handlebars: {err}")))?;
             *value = Value::String(rendered);
+            summary.handlebars_expansions += 1;
             Ok(())
         }
         Value::Array(items) => {
             for item in items {
-                render_handlebars_value(item, engine, context)?;
+                render_handlebars_value(item, engine, context, summary)?;
             }
             Ok(())
         }
         Value::Object(map) => {
             for entry in map.values_mut() {
-                render_handlebars_value(entry, engine, context)?;
+                render_handlebars_value(entry, engine, context, summary)?;
             }
             Ok(())
         }
@@ -419,7 +510,11 @@ fn is_reserved_handlebars_key(key: &str) -> bool {
     )
 }
 
-fn replace_placeholders(input: &str, ctx: &BindingContext) -> String {
+fn replace_placeholders(
+    input: &str,
+    ctx: &BindingContext,
+    summary: &mut BindingSummary,
+) -> Result<String, ComponentError> {
     let mut output = String::new();
     let mut cursor = 0;
     let bytes = input.as_bytes();
@@ -450,12 +545,18 @@ fn replace_placeholders(input: &str, ctx: &BindingContext) -> String {
         let rest = &input[absolute + 2..];
         if let Some(end) = rest.find('}') {
             let path = &rest[..end];
-            let replacement = ctx.lookup(path.trim()).map(|v| match v {
+            let Some(replacement) = ctx.lookup(path.trim()) else {
+                summary.missing_paths += 1;
+                return Err(ComponentError::Binding(format!(
+                    "missing binding path: {path}"
+                )));
+            };
+            let replacement = match replacement {
                 Value::String(s) => s,
                 other => other.to_string(),
-            });
-            let replacement = replacement.unwrap_or_default();
+            };
             output.push_str(&replacement);
+            summary.placeholder_replacements += 1;
             cursor = absolute + 2 + end + 1;
         } else {
             output.push(marker as char);
@@ -463,15 +564,21 @@ fn replace_placeholders(input: &str, ctx: &BindingContext) -> String {
         }
     }
 
-    output
+    Ok(output)
+}
+
+fn hash_bytes(bytes: &[u8]) -> String {
+    format!("blake3:{}", blake3::hash(bytes).to_hex())
+}
+
+fn hash_json(value: &Value) -> Option<String> {
+    let bytes = serde_json::to_vec(value).ok()?;
+    Some(hash_bytes(&bytes))
 }
 
 fn extract_single_placeholder(input: &str) -> Option<&str> {
     let trimmed = input.trim();
     if let Some(stripped) = trimmed.strip_prefix("@{").and_then(|s| s.strip_suffix('}')) {
-        return Some(stripped.trim());
-    }
-    if let Some(stripped) = trimmed.strip_prefix("${").and_then(|s| s.strip_suffix('}')) {
         return Some(stripped.trim());
     }
     None
@@ -498,6 +605,14 @@ fn extract_expression(input: &str) -> Option<&str> {
         return Some(stripped.trim());
     }
     None
+}
+
+fn is_simple_expression(expr: &str) -> bool {
+    let trimmed = expr.trim();
+    if trimmed.chars().any(|c| c.is_whitespace()) {
+        return false;
+    }
+    !trimmed.contains('?') && !trimmed.contains("==") && !trimmed.contains(':')
 }
 
 fn normalize_path(path: &str) -> String {

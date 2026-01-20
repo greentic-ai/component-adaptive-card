@@ -2,7 +2,7 @@
 
 Render, validate, and (optionally) attach interaction placeholders to **Microsoft Adaptive Cards** — with a focus on **cross-channel compatibility** (Teams, Web Chat, Webex up to 1.3) and **graceful downsampling** when a channel can’t render a full card.
 
-This component is designed to be used inside Greentic flows (via `greentic-flow add-step`) and tested locally (via `greentic-component test`).
+This component is designed to be used inside Greentic flows (via `greentic-dev flow add-step`) and tested locally (via `greentic-component test`).
 
 ---
 
@@ -80,15 +80,16 @@ Default mode assumes:
 - Optional interaction placeholders
 
 ```bash
-greentic-flow add-step \
-  --component component-adaptive-card \
-  --mode default
+greentic-dev flow add-step \
+  --flow flows/main.ygtc \
+  --after start \
+  --node-id adaptive-card \
+  --operation card \
+  --payload '{"input":{"card_source":"asset","card_spec":{"asset_path":"card.json","template_params":{}},"mode":"renderAndValidate"}}' \
+  --local-wasm target/wasm32-wasip2/release/component_adaptive_card.wasm
 ```
 
-You will be prompted for:
-- Card asset path
-- Whether interactions are needed
-- Optional interaction placeholders
+Default mode expects an explicit payload, so no interactive prompts are required.
 
 ---
 
@@ -97,18 +98,26 @@ You will be prompted for:
 Config mode exposes the full configuration surface.
 
 ```bash
-greentic-flow add-step \
-  --component component-adaptive-card \
-  --mode config
+greentic-dev flow add-step \
+  --flow flows/main.ygtc \
+  --after start \
+  --node-id adaptive-card \
+  --mode config \
+  --local-wasm target/wasm32-wasip2/release/component_adaptive_card.wasm \
+  --manifest component.manifest.json
 ```
 
 Or with a custom config flow file:
 
 ```bash
-greentic-flow add-step \
-  --component component-adaptive-card \
+greentic-dev flow add-step \
+  --flow flows/main.ygtc \
+  --after start \
+  --node-id adaptive-card \
   --mode config \
-  --config-flow ./dev_flows.custom
+  --config-flow ./dev_flows.custom \
+  --local-wasm target/wasm32-wasip2/release/component_adaptive_card.wasm \
+  --manifest component.manifest.json
 ```
 
 Config mode allows:
@@ -175,15 +184,9 @@ greentic-component test \
     "mode": "renderAndValidate",
     "interaction": {
       "enabled": true,
-      "type": "Submit",
+      "interaction_type": "Submit",
+      "action_id": "save",
       "card_instance_id": "card-1",
-      "actions": [
-        {
-          "id": "save",
-          "title": "Save",
-          "data": {}
-        }
-      ],
       "raw_inputs": { "comment": "Hello from state" }
     }
   }' \
@@ -196,15 +199,9 @@ greentic-component test \
     "mode": "renderAndValidate",
     "interaction": {
       "enabled": true,
-      "type": "Submit",
+      "interaction_type": "Submit",
+      "action_id": "save",
       "card_instance_id": "card-1",
-      "actions": [
-        {
-          "id": "save",
-          "title": "Save",
-          "data": {}
-        }
-      ],
       "raw_inputs": {}
     }
   }' \

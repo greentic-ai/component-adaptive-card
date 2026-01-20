@@ -29,11 +29,21 @@ pub enum InvocationMode {
     RenderAndValidate,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum ValidationMode {
+    Off,
+    #[default]
+    Warn,
+    Error,
+}
+
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct AdaptiveCardInvocation {
     #[serde(alias = "card_source")]
     pub card_source: CardSource,
+    #[serde(default)]
     #[serde(alias = "card_spec")]
     pub card_spec: CardSpec,
 
@@ -53,6 +63,10 @@ pub struct AdaptiveCardInvocation {
 
     #[serde(default)]
     pub mode: InvocationMode,
+
+    #[serde(default)]
+    #[serde(alias = "validation_mode")]
+    pub validation_mode: ValidationMode,
 
     /// Optional shared invocation envelope metadata from the host.
     #[serde(default)]

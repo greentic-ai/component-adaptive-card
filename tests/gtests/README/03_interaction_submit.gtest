@@ -1,0 +1,7 @@
+#SET OUT=${WORK_DIR}/interaction_submit.json
+#RUN greentic-component test --wasm ${REPO_ROOT}/target/wasm32-wasip2/release/component_adaptive_card.wasm --manifest ${REPO_ROOT}/component.manifest.json --op card --input-json '{"card_source":"asset","card_spec":{"asset_path":"${REPO_ROOT}/card.json","template_params":{}},"mode":"renderAndValidate","node_id":"readme-card","interaction":{"interaction_type":"Submit","action_id":"save","card_instance_id":"readme-card","raw_inputs":{"comment":"Hello from state"}}}' --state-dump
+#EXPECT_EXIT 0
+#CAPTURE_JSON > ${OUT}
+#EXPECT_JSONPATH ${OUT} event.actionType equals Submit
+#EXPECT_STDERR_CONTAINS eyJmb3JtX2RhdGEiOnsiY29tbWVudCI6IkhlbGxvIGZyb20gc3RhdGUifX0=
+#SAVE_ARTIFACT ${OUT}

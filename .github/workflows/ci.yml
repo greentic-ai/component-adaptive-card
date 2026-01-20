@@ -75,3 +75,16 @@ jobs:
             --annotation org.opencontainers.image.source="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}" \
             component.publish.manifest.json:application/vnd.greentic.component.manifest+json \
             "${WASM_BASENAME}":application/wasm
+  readme-gtests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-wasip2
+      - name: Install Greentic CLIs
+        run: cargo install greentic-component greentic-dev greentic-flow greentic-integration-tester --locked
+      - name: Build WASM (release)
+        run: cargo build --target wasm32-wasip2 --release
+      - name: Run README gtests
+        run: greentic-integration-tester run --gtest tests/gtests/README --artifacts-dir artifacts/readme-gtests

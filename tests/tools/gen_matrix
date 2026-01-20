@@ -1,0 +1,241 @@
+#!/usr/bin/env python3
+import argparse
+import itertools
+import json
+import shutil
+from pathlib import Path
+
+
+def load_spec(path: Path) -> dict:
+    with path.open("r", encoding="utf-8") as handle:
+        return json.load(handle)
+
+
+def cartesian(axes: dict) -> list[dict]:
+    keys = list(axes.keys())
+    combos = []
+    for values in itertools.product(*(axes[k] for k in keys)):
+        combos.append(dict(zip(keys, values)))
+    return combos
+
+
+def matches(combo: dict, matcher: dict) -> bool:
+    for key, value in matcher.items():
+        if combo.get(key) != value:
+            return False
+    return True
+
+
+def apply_constraints(combos: list[dict], constraints: dict) -> list[dict]:
+    excludes = constraints.get("exclude", [])
+    filtered = []
+    for combo in combos:
+        if any(matches(combo, rule) for rule in excludes):
+            continue
+        filtered.append(combo)
+    return filtered
+
+
+def build_inline_card(binding: str):
+    text = "Hello"
+    payload = {}
+    if binding == "handlebars":
+        text = "{{payload.title}}"
+        payload = {"title": "Hello"}
+    elif binding == "at_path":
+        text = "@{payload.title}"
+        payload = {"title": "Hello"}
+    elif binding == "defaults":
+        text = "@{payload.title||\"fallback\"}"
+        payload = {}
+    elif binding == "expr":
+        text = "${payload.count == 1 ? \"one\" : \"many\"}"
+        payload = {"count": 1}
+    elif binding == "mixed":
+        text = "Hello @{payload.title}"
+        payload = {"title": "World"}
+
+    card = {
+        "type": "AdaptiveCard",
+        "version": "1.3",
+        "body": [
+            {
+                "type": "TextBlock",
+                "text": text,
+            }
+        ],
+    }
+    return card, payload
+
+
+def build_interaction(kind: str):
+    if kind == "submit":
+        return {
+            "interaction_type": "Submit",
+            "action_id": "save",
+            "card_instance_id": "card-1",
+            "raw_inputs": {"comment": "ok"},
+        }
+    if kind == "showcard":
+        return {
+            "interaction_type": "ShowCard",
+            "action_id": "details",
+            "card_instance_id": "card-1",
+            "metadata": {"subcardId": "details"},
+        }
+    if kind == "toggle":
+        return {
+            "interaction_type": "ToggleVisibility",
+            "action_id": "section-1",
+            "card_instance_id": "card-1",
+            "metadata": {"visible": True},
+        }
+    return None
+
+
+def build_case(combo: dict):
+    invocation = {
+        "mode": combo["mode"],
+        "card_source": combo["card_source"],
+        "card_spec": {
+            "template_params": {},
+        },
+    }
+    env = {}
+
+    if combo["node_id"] == "present":
+        invocation["node_id"] = "matrix-node"
+
+    interaction = build_interaction(combo["interaction"])
+    if interaction is not None:
+        invocation["interaction"] = interaction
+
+    if combo["card_source"] == "inline":
+        card, payload = build_inline_card(combo["bindings"])
+        invocation["card_spec"]["inline_json"] = card
+        if payload:
+            invocation["payload"] = payload
+    elif combo["card_source"] == "asset":
+        if combo["assets"] == "missing":
+            invocation["card_spec"]["asset_path"] = "missing.json"
+        else:
+            invocation["card_spec"]["asset_path"] = "card.json"
+        if combo["assets"] == "registry":
+            invocation["card_spec"]["asset_registry"] = {"card.json": "card.json"}
+        elif combo["assets"] == "env":
+            env["ADAPTIVE_CARD_ASSET_REGISTRY"] = "${REPO_ROOT}/tests/fixtures/generated/asset_registry.json"
+    elif combo["card_source"] == "catalog":
+        if combo["assets"] == "missing":
+            invocation["card_spec"]["catalog_name"] = "missing-card"
+        else:
+            invocation["card_spec"]["catalog_name"] = "readme-card"
+        if combo["assets"] == "registry":
+            invocation["card_spec"]["asset_registry"] = {"readme-card": "card.json"}
+        elif combo["assets"] == "env":
+            env["ADAPTIVE_CARD_ASSET_REGISTRY"] = "${REPO_ROOT}/tests/fixtures/generated/asset_registry.json"
+
+    expect = {"pass": True}
+    if combo["card_source"] in ("asset", "catalog") and combo["assets"] == "missing":
+        expect = {
+            "pass": False,
+            "error_code": "AC_ASSET_NOT_FOUND",
+            "issue_codes": ["AC_ASSET_NOT_FOUND"],
+        }
+
+    return invocation, expect, env
+
+
+def write_json(path: Path, payload: dict):
+    path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+
+def write_gtest(path: Path, case_id: str, case_path: Path, expect: dict, env: dict, workdir: str | None):
+    lines = []
+    lines.append(f"#SET OUT=${{WORK_DIR}}/{case_id}.json")
+    if workdir:
+        lines.append(f"#WORKDIR {workdir}")
+    for key, value in sorted(env.items()):
+        lines.append(f"#ENV {key}={value}")
+    case_path_str = f"${{REPO_ROOT}}/{case_path.as_posix()}"
+    lines.append(
+        "#RUN greentic-component test --wasm ${REPO_ROOT}/target/wasm32-wasip2/release/component_adaptive_card.wasm "
+        "--manifest ${REPO_ROOT}/component.manifest.json --op card --input "
+        + case_path_str
+    )
+    lines.append("#EXPECT_EXIT 0")
+    lines.append("#CAPTURE_JSON > ${OUT}")
+    if expect.get("pass"):
+        lines.append("#EXPECT_JSONPATH ${OUT} error not_exists")
+    else:
+        lines.append(f"#EXPECT_JSONPATH ${{OUT}} error.code equals {expect['error_code']}")
+        for code in expect.get("issue_codes", []):
+            lines.append(
+                f"#EXPECT_JSONPATH ${{OUT}} error.details.validation_issues[*].code contains {code}"
+            )
+    lines.append("#SAVE_ARTIFACT ${OUT}")
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def ensure_dir(path: Path, wipe: bool = False):
+    if wipe and path.exists():
+        shutil.rmtree(path)
+    path.mkdir(parents=True, exist_ok=True)
+
+
+def generate(spec_path: Path, mode: str):
+    spec = load_spec(spec_path)
+    axes = spec["axes"]
+    combos = apply_constraints(cartesian(axes), spec.get("constraints", {}))
+
+    if mode == "pairwise":
+        limit = int(spec.get("pairwise_count", 30))
+        combos = combos[:limit]
+
+    cases_dir = Path("tests/fixtures/generated/cases")
+    expect_dir = Path("tests/fixtures/generated/expect")
+    gtest_dir = Path(f"tests/gtests/matrix/{mode}")
+    ensure_dir(cases_dir, wipe=(mode == "full"))
+    ensure_dir(expect_dir, wipe=(mode == "full"))
+    ensure_dir(gtest_dir, wipe=True)
+
+    asset_registry_path = Path("tests/fixtures/generated/asset_registry.json")
+    asset_registry = {"card.json": "card.json", "readme-card": "card.json"}
+    asset_registry_path.write_text(json.dumps(asset_registry, indent=2), encoding="utf-8")
+
+    for idx, combo in enumerate(combos, start=1):
+        case_id = f"case_{idx:04d}"
+        invocation, expect, env = build_case(combo)
+        case_path = cases_dir / f"{case_id}.json"
+        expect_path = expect_dir / f"{case_id}.yaml"
+        write_json(case_path, invocation)
+        write_json(expect_path, {"case_id": case_id, "combo": combo, "expect": expect})
+
+        workdir = None
+        if combo["card_source"] != "inline":
+            workdir = "${REPO_ROOT}"
+        if combo["assets"] == "env":
+            workdir = "${REPO_ROOT}"
+        write_gtest(
+            gtest_dir / f"{case_id}.gtest",
+            case_id,
+            case_path,
+            expect,
+            env,
+            workdir,
+        )
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--spec", default="tests/fixtures/matrix_spec.yaml")
+    parser.add_argument("--mode", choices=["pairwise", "full", "all"], default="all")
+    args = parser.parse_args()
+
+    if args.mode in ("pairwise", "all"):
+        generate(Path(args.spec), "pairwise")
+    if args.mode in ("full", "all"):
+        generate(Path(args.spec), "full")
+
+
+if __name__ == "__main__":
+    main()

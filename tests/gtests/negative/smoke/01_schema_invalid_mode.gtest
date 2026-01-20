@@ -1,0 +1,7 @@
+#SET OUT=${WORK_DIR}/schema_invalid_mode.json
+#RUN greentic-component test --wasm ${REPO_ROOT}/target/wasm32-wasip2/release/component_adaptive_card.wasm --manifest ${REPO_ROOT}/component.manifest.json --op card --input-json '{"card_spec":{"inline_json":{}},"mode":"nope","validation_mode":"error"}'
+#EXPECT_EXIT 0
+#CAPTURE_JSON > ${OUT}
+#EXPECT_JSONPATH ${OUT} error.code equals AC_SCHEMA_INVALID
+#EXPECT_JSONPATH ${OUT} error.details.validation_issues[*].code contains AC_INVOCATION_INVALID_ENUM
+#SAVE_ARTIFACT ${OUT}

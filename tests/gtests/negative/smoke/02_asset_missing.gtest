@@ -1,0 +1,7 @@
+#SET OUT=${WORK_DIR}/asset_missing.json
+#RUN greentic-component test --wasm ${REPO_ROOT}/target/wasm32-wasip2/release/component_adaptive_card.wasm --manifest ${REPO_ROOT}/component.manifest.json --op card --input-json '{"card_source":"asset","card_spec":{"asset_path":"${REPO_ROOT}/tests/assets/cards/missing.json","template_params":{}}}'
+#EXPECT_EXIT 0
+#CAPTURE_JSON > ${OUT}
+#EXPECT_JSONPATH ${OUT} error.code equals AC_ASSET_NOT_FOUND
+#EXPECT_JSONPATH ${OUT} error.details.validation_issues[*].code contains AC_ASSET_NOT_FOUND
+#SAVE_ARTIFACT ${OUT}
