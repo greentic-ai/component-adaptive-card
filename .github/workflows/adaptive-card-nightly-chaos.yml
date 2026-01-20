@@ -51,6 +51,8 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
           key: ${{ runner.os }}-cargo-bins-${{ hashFiles('**/Cargo.lock') }}
+      - name: Login to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
       - name: Build WASM (release)
         run: cargo build --target wasm32-wasip2 --release
       - name: Generate matrix gtests
