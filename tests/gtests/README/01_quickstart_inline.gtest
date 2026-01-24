@@ -14,7 +14,13 @@ nodes:
     routing:
       - out: true
 EOF
-#RUN greentic-dev flow add-step --flow ${FLOW} --node-id adaptive-card --operation card --payload '{"input":{"card_source":"asset","card_spec":{"asset_path":"card.json","template_params":{}},"mode":"renderAndValidate"}}' --component oci://ghcr.io/greentic-ai/components/component-adaptive-card:latest --after start
+#RUN cp ${REPO_ROOT}/component.manifest.json ${WORK_DIR}/component.manifest.json
+#EXPECT_EXIT 0
+#RUN cp ${REPO_ROOT}/card.json ${WORK_DIR}/card.json
+#EXPECT_EXIT 0
+#RUN cp ${REPO_ROOT}/target/wasm32-wasip2/release/component_adaptive_card.wasm ${WORK_DIR}/component_adaptive_card.wasm
+#EXPECT_EXIT 0
+#RUN greentic-dev flow add-step --flow ${FLOW} --node-id adaptive-card --operation card --payload '{"input":{"card_source":"asset","card_spec":{"asset_path":"card.json","template_params":{}},"mode":"renderAndValidate"}}' --local-wasm ./component_adaptive_card.wasm --manifest ./component.manifest.json --after start
 #EXPECT_EXIT 0
 #SET RESOLVE=${FLOW}.resolve.json
 #WRITE ${RESOLVE} <<<EOF

@@ -61,7 +61,7 @@
     "custom": {
       "format": "flow-ir-json",
       "graph": {
-        "description": "Guided config flow for ai.greentic.component-adaptive-card",
+        "description": "Auto-generated custom config for ai.greentic.component-adaptive-card",
         "id": "ai.greentic.component-adaptive-card.custom",
         "kind": "component-config",
         "nodes": {
@@ -69,123 +69,33 @@
             "questions": {
               "fields": [
                 {
-                  "default": "asset",
+                  "default": "inline",
                   "id": "card_source",
                   "options": [
-                    "asset",
                     "inline",
+                    "asset",
                     "catalog"
                   ],
-                  "prompt": "Where does the Adaptive Card come from?",
+                  "prompt": "Where to load the card from.",
                   "type": "enum"
-                },
-                {
-                  "default": "assets/cards/incident.json",
-                  "id": "asset_path",
-                  "prompt": "Asset path (relative path or registry path)",
-                  "required": true,
-                  "show_if": {
-                    "id": "card_source",
-                    "equals": "asset"
-                  },
-                  "type": "string"
                 },
                 {
                   "default": {
-                    "type": "AdaptiveCard",
-                    "version": "1.3",
-                    "body": [],
-                    "actions": []
+                    "inline_json": {}
                   },
-                  "id": "inline_json",
-                  "prompt": "Paste the Adaptive Card JSON for inline mode",
-                  "required": true,
-                  "show_if": {
-                    "id": "card_source",
-                    "equals": "inline"
-                  },
-                  "type": "json"
-                },
-                {
-                  "default": "default",
-                  "id": "catalog_name",
-                  "prompt": "Catalog name",
-                  "required": true,
-                  "show_if": {
-                    "id": "card_source",
-                    "equals": "catalog"
-                  },
+                  "id": "card_spec",
+                  "prompt": "Details for resolving the card source.",
                   "type": "string"
                 },
                 {
-                  "default": "incident_summary",
-                  "id": "catalog_item",
-                  "prompt": "Catalog item/template key",
-                  "required": true,
-                  "show_if": {
-                    "id": "card_source",
-                    "equals": "catalog"
-                  },
+                  "id": "envelope",
+                  "prompt": "Optional Greentic invocation envelope metadata.",
                   "type": "string"
                 },
                 {
-                  "default": {},
-                  "id": "template_params",
-                  "prompt": "Template params to inject into the card template (optional)",
-                  "type": "json"
-                },
-                {
-                  "default": false,
-                  "id": "needs_interaction",
-                  "prompt": "Does this card need user interaction (Submit/Execute actions)?",
-                  "type": "boolean"
-                },
-                {
-                  "default": "Submit",
-                  "id": "interaction_type",
-                  "options": [
-                    "Submit",
-                    "Execute"
-                  ],
-                  "prompt": "What kind of interaction should the placeholder use?",
-                  "required": true,
-                  "show_if": {
-                    "id": "needs_interaction",
-                    "equals": true
-                  },
-                  "type": "enum"
-                },
-                {
-                  "default": "action-1",
-                  "id": "action_id",
-                  "prompt": "Action id (used for routing/handlers)?",
-                  "required": true,
-                  "show_if": {
-                    "id": "needs_interaction",
-                    "equals": true
-                  },
+                  "id": "interaction",
+                  "prompt": "Interaction:",
                   "type": "string"
-                },
-                {
-                  "default": "card-1",
-                  "id": "card_instance_id",
-                  "prompt": "Card instance id (unique identifier for this card)?",
-                  "required": true,
-                  "show_if": {
-                    "id": "needs_interaction",
-                    "equals": true
-                  },
-                  "type": "string"
-                },
-                {
-                  "default": {},
-                  "id": "raw_inputs",
-                  "prompt": "Raw inputs placeholder (default empty)",
-                  "show_if": {
-                    "id": "needs_interaction",
-                    "equals": true
-                  },
-                  "type": "json"
                 },
                 {
                   "default": "renderAndValidate",
@@ -204,28 +114,30 @@
                   "type": "string"
                 },
                 {
-                  "default": {},
                   "id": "payload",
                   "prompt": "Explicit input payload used for binding/expression resolution.",
-                  "type": "json"
+                  "type": "string"
                 },
                 {
-                  "default": {},
                   "id": "session",
                   "prompt": "Optional explicit session metadata (not injected by the runner).",
-                  "type": "json"
+                  "type": "string"
                 },
                 {
-                  "default": {},
                   "id": "state",
                   "prompt": "Optional explicit state override (persistent state uses state-store).",
-                  "type": "json"
+                  "type": "string"
                 },
                 {
-                  "default": {},
-                  "id": "envelope",
-                  "prompt": "Optional Greentic invocation envelope metadata.",
-                  "type": "json"
+                  "default": "warn",
+                  "id": "validation_mode",
+                  "options": [
+                    "off",
+                    "warn",
+                    "error"
+                  ],
+                  "prompt": "How to handle invocation schema validation issues.",
+                  "type": "enum"
                 }
               ]
             },
@@ -236,7 +148,7 @@
             ]
           },
           "emit_config": {
-            "template": "{\n  \"node_id\": \"component-adaptive-card\",\n  \"node\": {\n    \"card\": {\n      \"input\": {\n        \"card_source\": \"{{state.card_source}}\",\n        \"card_spec\": {{#ifEq state.card_source \"asset\"}}{\n          \"asset_path\": \"{{state.asset_path}}\",\n          \"template_params\": {{json state.template_params}}\n        }{{/ifEq}}{{#ifEq state.card_source \"inline\"}}{\n          \"inline_json\": {{json state.inline_json}},\n          \"template_params\": {{json state.template_params}}\n        }{{/ifEq}}{{#ifEq state.card_source \"catalog\"}}{\n          \"catalog_name\": \"{{state.catalog_name}}\",\n          \"catalog_item\": \"{{state.catalog_item}}\",\n          \"template_params\": {{json state.template_params}}\n        }{{/ifEq}},\n        \"mode\": \"{{state.mode}}\",\n        \"node_id\": \"{{state.node_id}}\",\n        \"payload\": {{json state.payload}},\n        \"session\": {{json state.session}},\n        \"state\": {{json state.state}},\n        \"envelope\": {{json state.envelope}}{{#if state.needs_interaction}},\n        \"interaction\": {\n          \"interaction_type\": \"{{state.interaction_type}}\",\n          \"action_id\": \"{{state.action_id}}\",\n          \"card_instance_id\": \"{{state.card_instance_id}}\",\n          \"raw_inputs\": {{json state.raw_inputs}}\n        }{{/if}}\n      }\n    },\n    \"routing\": [\n      { \"to\": \"NEXT_NODE_PLACEHOLDER\" }\n    ]\n  }\n}"
+            "template": "{\n  \"node_id\": \"component-adaptive-card\",\n  \"node\": {\n    \"card\": {\n      \"input\": {\n        \"card_source\": \"{{state.card_source}}\",\n        \"card_spec\": \"{{state.card_spec}}\",\n        \"envelope\": \"{{state.envelope}}\",\n        \"interaction\": \"{{state.interaction}}\",\n        \"mode\": \"{{state.mode}}\",\n        \"node_id\": \"{{state.node_id}}\",\n        \"payload\": \"{{state.payload}}\",\n        \"session\": \"{{state.session}}\",\n        \"state\": \"{{state.state}}\",\n        \"validation_mode\": \"{{state.validation_mode}}\"\n      }\n    },\n    \"routing\": [\n      { \"to\": \"NEXT_NODE_PLACEHOLDER\" }\n    ]\n  }\n}"
           }
         }
       }
@@ -244,91 +156,19 @@
     "default": {
       "format": "flow-ir-json",
       "graph": {
-        "description": "Default config flow for ai.greentic.component-adaptive-card",
+        "description": "Auto-generated default config for ai.greentic.component-adaptive-card",
         "id": "ai.greentic.component-adaptive-card.default",
         "kind": "component-config",
         "nodes": {
-          "ask_config": {
-            "questions": {
-              "fields": [
-                {
-                  "default": "assets/cards/incident.json",
-                  "example": "assets/cards/incident.json",
-                  "id": "asset_path",
-                  "prompt": "Where is the Adaptive Card asset (relative path or registry path)?",
-                  "required": true,
-                  "type": "string"
-                },
-                {
-                  "default": false,
-                  "id": "needs_interaction",
-                  "prompt": "Does this card need user interaction (Submit/Execute actions)?",
-                  "type": "boolean"
-                },
-                {
-                  "default": "Submit",
-                  "id": "interaction_type",
-                  "options": [
-                    "Submit",
-                    "Execute"
-                  ],
-                  "prompt": "What kind of interaction should the placeholder use?",
-                  "required": true,
-                  "show_if": {
-                    "id": "needs_interaction",
-                    "equals": true
-                  },
-                  "type": "enum"
-                },
-                {
-                  "default": "action-1",
-                  "id": "action_id",
-                  "prompt": "Action id (used for routing/handlers)?",
-                  "required": true,
-                  "show_if": {
-                    "id": "needs_interaction",
-                    "equals": true
-                  },
-                  "type": "string"
-                },
-                {
-                  "default": "card-1",
-                  "id": "card_instance_id",
-                  "prompt": "Card instance id (unique identifier for this card)?",
-                  "required": true,
-                  "show_if": {
-                    "id": "needs_interaction",
-                    "equals": true
-                  },
-                  "type": "string"
-                },
-                {
-                  "default": {},
-                  "id": "raw_inputs",
-                  "prompt": "Raw inputs placeholder (default empty)",
-                  "show_if": {
-                    "id": "needs_interaction",
-                    "equals": true
-                  },
-                  "type": "json"
-                }
-              ]
-            },
-            "routing": [
-              {
-                "to": "emit_config"
-              }
-            ]
-          },
           "emit_config": {
-            "template": "{\n  \"node_id\": \"component-adaptive-card\",\n  \"node\": {\n    \"card\": {\n      \"input\": {\n        \"card_source\": \"asset\",\n        \"card_spec\": {\n          \"asset_path\": \"{{state.asset_path}}\",\n          \"template_params\": {}\n        },\n        \"mode\": \"renderAndValidate\"{{#if state.needs_interaction}},\n        \"interaction\": {\n          \"interaction_type\": \"{{state.interaction_type}}\",\n          \"action_id\": \"{{state.action_id}}\",\n          \"card_instance_id\": \"{{state.card_instance_id}}\",\n          \"raw_inputs\": {{json state.raw_inputs}}\n        }{{/if}}\n      }\n    },\n    \"routing\": [\n      { \"to\": \"NEXT_NODE_PLACEHOLDER\" }\n    ]\n  }\n}"
+            "template": "{\n  \"node_id\": \"component-adaptive-card\",\n  \"node\": {\n    \"card\": {\n      \"input\": {\n        \"card_spec\": {\"inline_json\":{}}\n      }\n    },\n    \"routing\": [\n      { \"to\": \"NEXT_NODE_PLACEHOLDER\" }\n    ]\n  }\n}"
           }
         }
       }
     }
   },
   "hashes": {
-    "component_wasm": "blake3:21191533af6932a448d88bbb5759f14b96bfcfbb3fa06118409ff47a99de0e48"
+    "component_wasm": "blake3:a9aa537a210ad1393240765422b7f036a6e940f0b95ff2efa3ddc389719a37b8"
   },
   "id": "ai.greentic.component-adaptive-card",
   "limits": {
