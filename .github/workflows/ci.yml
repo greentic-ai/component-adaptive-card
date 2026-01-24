@@ -112,4 +112,8 @@ jobs:
       - name: Build WASM (release)
         run: cargo build --target wasm32-wasip2 --release
       - name: Run README gtests
-        run: greentic-integration-tester run --gtest tests/gtests/README --artifacts-dir artifacts/readme-gtests
+        env:
+          GREENTIC_TRACE_OUT: artifacts/readme-gtests/trace.json
+        run: |
+          mkdir -p artifacts/readme-gtests
+          greentic-integration-tester run --gtest tests/gtests/README --artifacts-dir artifacts/readme-gtests --errors
