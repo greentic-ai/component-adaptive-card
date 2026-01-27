@@ -182,6 +182,10 @@ pub fn handle_message(operation: &str, input: &str) -> String {
             );
         }
     };
+    eprintln!(
+        "DEBUG invocation payload: {}",
+        serde_json::to_string(&invocation.payload).unwrap_or_else(|_| "\"<error>\"".to_string())
+    );
     // Allow the operation name to steer mode selection if the host provides it.
     if operation.eq_ignore_ascii_case("validate") {
         invocation.mode = InvocationMode::Validate;
@@ -357,6 +361,32 @@ fn merge_envelope(
         inv.envelope = serde_json::from_value(envelope.clone()).ok();
     }
     Ok(inv)
+}
+
+#[cfg(test)]
+mod debug_tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn parse_payload_value() {
+        let input = json!({
+            "card_spec": {
+                "inline_json": {
+                    "type": "AdaptiveCard",
+                    "version": "1.3",
+                    "body": [
+                        { "type": "TextBlock", "text": "@{payload.title}" }
+                    ]
+                }
+            },
+            "payload": {
+                "title": "Hello"
+            }
+        });
+        let invocation = parse_invocation_value(&input).expect("should parse");
+        println!("payload: {}", invocation.payload);
+    }
 }
 
 fn merge_envelope_struct(

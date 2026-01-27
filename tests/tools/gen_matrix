@@ -199,7 +199,7 @@ def generate(spec_path: Path, mode: str):
     ensure_dir(gtest_dir, wipe=True)
 
     asset_registry_path = Path("tests/fixtures/generated/asset_registry.json")
-    asset_registry = {"card.json": "card.json", "readme-card": "card.json"}
+    asset_registry = {"card.json": "card.json", "readme-card": "assets/readme-card.json"}
     asset_registry_path.write_text(json.dumps(asset_registry, indent=2), encoding="utf-8")
 
     for idx, combo in enumerate(combos, start=1):

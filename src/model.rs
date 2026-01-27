@@ -41,6 +41,7 @@ pub enum ValidationMode {
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct AdaptiveCardInvocation {
+    #[serde(default)]
     #[serde(alias = "card_source")]
     pub card_source: CardSource,
     #[serde(default)]
