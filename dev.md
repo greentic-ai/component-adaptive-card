@@ -6,7 +6,7 @@ Channel-agnostic Adaptive Card engine for Greentic components. It renders Adapti
 - Optional routing events describing the triggered action.
 
 ## Requirements
-- Rust 1.89+
+- Rust 1.90+
 - `wasm32-wasip2` target (`rustup target add wasm32-wasip2`)
 
 ## Development

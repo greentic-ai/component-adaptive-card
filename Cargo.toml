@@ -1,9 +1,9 @@
 [package]
 name = "component-adaptive-card"
-version = "0.1.11"
+version = "0.1.12"
 edition = "2024"
 license = "MIT"
-rust-version = "1.89"
+rust-version = "1.90"
 description = "Greentic component component-adaptive-card"
 repository = "https://github.com/component-adaptive-card"
 authors = ["maarten"]
@@ -18,7 +18,7 @@ thiserror = "2"
 once_cell = "1.19"
 greentic-types = { version = "0.4" }
 handlebars = "6"
-jsonschema = { version = "0.40", default-features = false }
+jsonschema = { version = "0.41", default-features = false }
 blake3 = "1"
 
 [features]

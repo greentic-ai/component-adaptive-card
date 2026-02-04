@@ -25,7 +25,8 @@ nodes:
             "catalog_registry_file": "{{state.catalog_registry_file}}"
           },
           "routing": [
-            { "to": "NEXT_NODE_PLACEHOLDER" }
+            { "to": "NEXT_NODE_PLACEHOLDER" },
+            { "out": true }
           ]
         }
       }

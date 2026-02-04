@@ -23,7 +23,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: 1.89.0
+          toolchain: 1.90.0
           targets: wasm32-wasip2
       - name: Restore cargo binaries cache
         uses: actions/cache/restore@v4

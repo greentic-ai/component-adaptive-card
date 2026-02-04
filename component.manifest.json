@@ -168,7 +168,7 @@
     }
   },
   "hashes": {
-    "component_wasm": "blake3:c41c9141f0bcda42fa5a44f6a5bbe8961b7ea3052716c30cef8e1adee909e8b0"
+    "component_wasm": "blake3:1314326c1315587330dbfd1020e7b1556636009fb8b94dcf6a55555bc8283c6b"
   },
   "id": "ai.greentic.component-adaptive-card",
   "limits": {
