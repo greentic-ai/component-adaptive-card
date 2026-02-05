@@ -100,7 +100,9 @@ jobs:
             cargo install cargo-binstall --locked
           fi
       - name: Install Greentic CLIs
-        run: cargo binstall -y greentic-dev greentic-flow greentic-integration-tester
+        run: |
+          cargo binstall -y greentic-dev greentic-flow greentic-integration-tester
+          cargo binstall -y greentic-component --force
       - name: Save cargo binaries cache
         if: always()
         uses: actions/cache/save@v4
